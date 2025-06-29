@@ -1,0 +1,39 @@
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --strict-markers"
+testpaths = ["tests"]
+markers = [
+    "unit: mark test as unit test",
+    "integration: mark test as integration test requiring real services",
+    "performance: mark test as performance test",
+    "slow: mark test as slow running",
+    "openai: mark test as requiring OpenAI API",
+    "twilio: mark test as requiring Twilio API",
+    "firebase: mark test as requiring Firebase",
+    "memory: mark test as memory intensive"
+]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "*/tests/*",
+    "*/venv/*",
+    "*/__pycache__/*",
+    "*/migrations/*"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:"
+]
