@@ -1,85 +1,76 @@
-# 🚀 SMS Outreach System - Jank Demo UI
+# SMS Outreach System - Demo UI
 
-This is a basic React UI to demonstrate the SMS outreach system functionality.
+A React-based demonstration interface for the SMS outreach system backend.
 
-## 🎯 What This Demo Shows
+## Technical Overview
 
-- **Customer Management**: Add and list customers
-- **AI Conversations**: Start AI-powered conversations with customers
-- **Mock SMS**: Simulate customer responses (since Twilio isn't set up)
-- **Manual Intervention**: Staff can manually respond at any time
-- **Real-time Updates**: Messages refresh automatically
+This is a basic React application built with Create React App that provides a frontend interface for testing and demonstrating the SMS outreach system functionality. The app communicates with a FastAPI backend via REST API calls.
 
-## 🔧 Setup
+**Key Features:**
+- Customer management interface
+- AI conversation testing
+- Mock SMS response simulation
+- Manual staff intervention controls
+- Real-time message updates (3-second polling)
 
-1. **Start the Backend** (from main project root):
+## Requirements
+
+- **Node.js**: 16.x or higher (tested with 16+)
+- **npm**: 7.x or higher
+- **Backend**: SMS outreach system running on port 8000
+
+## Dependencies
+
+### Production Dependencies
+- **React**: ^18.2.0 - Core React library
+- **React DOM**: ^18.2.0 - React DOM rendering
+- **React Scripts**: 5.0.1 - Build toolchain from Create React App
+- **Web Vitals**: ^2.1.4 - Performance metrics
+
+### Development Dependencies
+- **Testing Library**: Jest DOM, React, and User Event for testing
+- **Proxy Configuration**: Configured to proxy API requests to `http://localhost:8000`
+
+## Setup & Installation
+
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Start the backend** (from project root):
    ```bash
    cd ..
    python run_dev.py
    ```
-   Backend should be running on http://localhost:8000
+   Backend must be running on http://localhost:8000
 
-2. **Start the Frontend** (in this directory):
+3. **Start the frontend**:
    ```bash
    npm start
    ```
-   Frontend will open on http://localhost:3000
+   Application will open on http://localhost:3000
 
-## 🎮 How to Use
+## Build & Deploy
 
-### 1. Add a Customer
+```bash
+# Production build
+npm run build
 
-- Click "➕ Add Customer"
-- Fill in name, phone, notes, tags
-- Click "Add Customer"
+# Run tests
+npm test
 
-### 2. Start a Conversation
+# Eject from Create React App (not recommended)
+npm run eject
+```
 
-- Go back to "📋 Customers"
-- Click "View Conversation" for any customer
-- Click "🚀 Start AI Conversation"
-- Choose message type (follow-up, welcome, etc.)
-- Add context if needed
-- AI will generate and "send" the initial message
+## API Integration
 
-### 3. Mock Customer Responses
+The application communicates with the backend via REST API calls. API requests are automatically proxied to the backend server through the proxy configuration in `package.json`.
 
-- In the conversation view, use "📱 Mock Customer Response"
-- Type what the customer would text back
-- AI will automatically generate and "send" a response
-- Continue the conversation as long as you want
+## Limitations
 
-### 4. Manual Intervention
-
-- Use "👩‍💼 Manual Staff Response" to override AI
-- Type your own message to send as staff
-- This simulates when escalation happens
-
-## 🔍 What to Look For
-
-- **AI Message Generation**: See how AI creates personalized messages
-- **Conversation Flow**: Watch how AI maintains context
-- **Status Indicators**:
-    - 🟢 AI Active
-    - 🔴 Escalated
-    - ⚫ No Messages
-- **Message Sources**: See "ai" vs "manual" sources
-- **Auto-refresh**: Messages update every 3 seconds
-
-## ⚠️ Limitations
-
-- **No Real SMS**: Uses demo endpoints since Twilio not configured
-- **No CSS**: Intentionally ugly for rapid development
-- **Basic Error Handling**: Alerts for errors
-- **Hardcoded API Key**: For demo purposes only
-
-## 🎯 For Your Business Partner
-
-This shows exactly how the system works:
-
-1. **Staff starts conversations** with one click
-2. **AI handles customer replies** automatically
-3. **Staff can intervene** when needed
-4. **Everything is tracked** in the database
-
-The real system will work the same way, but with actual SMS instead of mock responses!
+- No real SMS integration (uses mock endpoints)
+- Basic styling (intentionally minimal for rapid development)
+- Simple error handling with browser alerts
+- Hardcoded API configurations for demo purposes
