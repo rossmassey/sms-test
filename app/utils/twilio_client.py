@@ -2,14 +2,14 @@
 Twilio client utilities for sending SMS and webhook validation.
 """
 
-import os
-import hmac
-import hashlib
 import base64
-from urllib.parse import urlparse
-from twilio.rest import Client
-from twilio.base.exceptions import TwilioException
+import hashlib
+import hmac
+import os
+
 from dotenv import load_dotenv
+from twilio.base.exceptions import TwilioException
+from twilio.rest import Client
 
 # Load environment variables
 load_dotenv()
@@ -23,6 +23,7 @@ if not all([account_sid, auth_token, twilio_phone]):
     raise ValueError("Twilio credentials not properly configured in environment variables")
 
 twilio_client = Client(account_sid, auth_token)
+
 
 async def send_sms(to_phone: str, message_body: str) -> str:
     """
@@ -43,19 +44,20 @@ async def send_sms(to_phone: str, message_body: str) -> str:
         if not to_phone.startswith('+'):
             # Add US country code if not present
             to_phone = f"+1{to_phone.replace('-', '').replace('(', '').replace(')', '').replace(' ', '')}"
-        
+
         message = twilio_client.messages.create(
             body=message_body,
             from_=twilio_phone,
             to=to_phone
         )
-        
+
         return message.sid
-    
+
     except TwilioException as e:
         raise Exception(f"Twilio error: {str(e)}")
     except Exception as e:
         raise Exception(f"SMS sending failed: {str(e)}")
+
 
 def verify_webhook_signature(request_body: bytes, signature: str, url: str) -> bool:
     """
@@ -74,7 +76,7 @@ def verify_webhook_signature(request_body: bytes, signature: str, url: str) -> b
         auth_token = os.getenv("TWILIO_AUTH_TOKEN")
         if not auth_token:
             return False
-        
+
         # Create expected signature
         expected_signature = base64.b64encode(
             hmac.new(
@@ -83,12 +85,13 @@ def verify_webhook_signature(request_body: bytes, signature: str, url: str) -> b
                 hashlib.sha1
             ).digest()
         ).decode('utf-8')
-        
+
         # Compare signatures
         return hmac.compare_digest(expected_signature, signature)
-    
+
     except Exception:
         return False
+
 
 async def get_message_status(message_sid: str) -> dict:
     """
@@ -102,7 +105,7 @@ async def get_message_status(message_sid: str) -> dict:
     """
     try:
         message = twilio_client.messages(message_sid).fetch()
-        
+
         return {
             'sid': message.sid,
             'status': message.status,
@@ -111,9 +114,10 @@ async def get_message_status(message_sid: str) -> dict:
             'date_sent': message.date_sent,
             'date_updated': message.date_updated
         }
-    
+
     except TwilioException as e:
         raise Exception(f"Error fetching message status: {str(e)}")
+
 
 async def get_account_balance() -> float:
     """
@@ -125,9 +129,10 @@ async def get_account_balance() -> float:
     try:
         balance = twilio_client.balance.fetch()
         return float(balance.balance)
-    
+
     except TwilioException as e:
         raise Exception(f"Error fetching account balance: {str(e)}")
+
 
 def format_phone_number(phone: str) -> str:
     """
@@ -142,15 +147,15 @@ def format_phone_number(phone: str) -> str:
     # If already in E.164 format, return as-is
     if phone.startswith('+'):
         return phone
-    
+
     # Remove all non-digit characters
     digits = ''.join(filter(str.isdigit, phone))
-    
+
     # Add country code if not present (assumes US)
     if len(digits) == 10:
         digits = f"1{digits}"
     elif len(digits) == 11 and digits.startswith('1'):
         # Already has country code
         pass
-    
+
     return f"+{digits}"

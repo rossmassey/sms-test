@@ -5,9 +5,10 @@ Sets up the FastAPI app, middleware, and router registration.
 
 import os
 from contextlib import asynccontextmanager
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
 
 from .database import initialize_firebase
 from .routes import customers, messages
@@ -15,12 +16,14 @@ from .routes import customers, messages
 # Load environment variables
 load_dotenv()
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize services on startup."""
     # Initialize Firebase
     initialize_firebase()
     yield
+
 
 # Create FastAPI app
 app = FastAPI(
@@ -39,17 +42,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Security dependency for API key authentication
 async def verify_api_key(x_api_key: str = Header(None)):
     """Verify API key for protected endpoints."""
     expected_api_key = os.getenv("API_KEY")
     if not expected_api_key:
         raise HTTPException(status_code=500, detail="API key not configured")
-    
+
     if x_api_key != expected_api_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
-    
+
     return x_api_key
+
 
 # Health check endpoint
 @app.get("/")
@@ -60,6 +65,7 @@ async def health_check():
         "service": "SMS Outreach Backend",
         "version": "1.0.0"
     }
+
 
 # Include routers
 app.include_router(
@@ -78,4 +84,5 @@ app.include_router(
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

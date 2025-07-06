@@ -3,9 +3,10 @@ OpenAI LLM client utilities for message composition and auto-replies.
 """
 
 import os
-from typing import List, Dict, Tuple, Optional
-from openai import AsyncOpenAI
+from typing import List, Tuple, Optional
+
 from dotenv import load_dotenv
+from openai import AsyncOpenAI
 
 # Load environment variables
 load_dotenv()
@@ -76,10 +77,11 @@ ESCALATE: [true/false]
 REASON: [brief explanation]
 """
 
+
 async def generate_outbound_message(
-    customer_data: dict,
-    context: Optional[str] = None,
-    prompt_template: Optional[str] = None
+        customer_data: dict,
+        context: Optional[str] = None,
+        prompt_template: Optional[str] = None
 ) -> str:
     """
     Generate an AI-powered outbound SMS message for a customer.
@@ -98,7 +100,7 @@ async def generate_outbound_message(
     try:
         # Use provided template or default
         template = prompt_template or DEFAULT_OUTBOUND_TEMPLATE
-        
+
         # Format the prompt with customer data
         prompt = template.format(
             customer_name=customer_data.get('name', 'Valued Customer'),
@@ -108,45 +110,48 @@ async def generate_outbound_message(
             customer_last_visit=customer_data.get('last_visit', 'Unknown'),
             context=context or 'General outreach message'
         )
-        
+
         response = await openai_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a helpful customer service AI that generates personalized SMS messages."},
+                {"role": "system",
+                 "content": "You are a helpful customer service AI that generates personalized SMS messages."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=150,
             temperature=0.7
         )
-        
+
         message_content = response.choices[0].message.content.strip()
-        
+
         # Ensure message isn't too long (SMS limit is 160 chars, but allow some buffer)
         if len(message_content) > 160:
             # Try to regenerate with stricter length requirement
             prompt += "\n\nIMPORTANT: The message MUST be under 160 characters."
-            
+
             response = await openai_client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "system", "content": "You are a helpful customer service AI. Generate concise SMS messages under 160 characters."},
+                    {"role": "system",
+                     "content": "You are a helpful customer service AI. Generate concise SMS messages under 160 characters."},
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=100,
                 temperature=0.7
             )
-            
+
             message_content = response.choices[0].message.content.strip()
-        
+
         return message_content
-    
+
     except Exception as e:
         raise Exception(f"Error generating outbound message: {str(e)}")
 
+
 async def generate_auto_reply(
-    incoming_message: str,
-    customer_data: dict,
-    message_history: List[dict]
+        incoming_message: str,
+        customer_data: dict,
+        message_history: List[dict]
 ) -> Tuple[Optional[str], bool]:
     """
     Generate an auto-reply to an incoming SMS and determine if escalation is needed.
@@ -168,10 +173,10 @@ async def generate_auto_reply(
         for msg in message_history[-5:]:  # Last 5 messages for context
             direction = "Customer" if msg.get('direction') == 'inbound' else "Us"
             history_text += f"{direction}: {msg.get('content', '')}\n"
-        
+
         if not history_text:
             history_text = "No recent message history"
-        
+
         # Format the prompt
         prompt = DEFAULT_AUTO_REPLY_TEMPLATE.format(
             incoming_message=incoming_message,
@@ -181,23 +186,24 @@ async def generate_auto_reply(
             customer_tags=', '.join(customer_data.get('tags', [])) or 'None',
             message_history=history_text
         )
-        
+
         response = await openai_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a customer service AI that processes incoming SMS messages and decides whether to auto-reply or escalate to humans."},
+                {"role": "system",
+                 "content": "You are a customer service AI that processes incoming SMS messages and decides whether to auto-reply or escalate to humans."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=200,
             temperature=0.3  # Lower temperature for more consistent responses
         )
-        
+
         response_text = response.choices[0].message.content.strip()
-        
+
         # Parse the response
         auto_reply = None
         should_escalate = True  # Default to escalation for safety
-        
+
         lines = response_text.split('\n')
         for line in lines:
             if line.startswith('AUTO_REPLY:'):
@@ -207,13 +213,14 @@ async def generate_auto_reply(
             elif line.startswith('ESCALATE:'):
                 escalate_value = line.replace('ESCALATE:', '').strip().lower()
                 should_escalate = escalate_value in ['true', 'yes', '1']
-        
+
         return auto_reply, should_escalate
-    
+
     except Exception as e:
         # On error, escalate to human for safety
         print(f"Error generating auto-reply: {str(e)}")
         return None, True
+
 
 async def analyze_message_sentiment(message: str) -> dict:
     """
@@ -237,19 +244,20 @@ async def analyze_message_sentiment(message: str) -> dict:
         KEYWORDS: [comma-separated key topics]
         CUSTOMER_INTENT: [brief description of what customer wants]
         """
-        
+
         response = await openai_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a message analysis AI that categorizes customer communications."},
+                {"role": "system",
+                 "content": "You are a message analysis AI that categorizes customer communications."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=150,
             temperature=0.1
         )
-        
+
         response_text = response.choices[0].message.content.strip()
-        
+
         # Parse response
         analysis = {
             'sentiment': 'neutral',
@@ -257,7 +265,7 @@ async def analyze_message_sentiment(message: str) -> dict:
             'keywords': [],
             'customer_intent': 'Unknown'
         }
-        
+
         lines = response_text.split('\n')
         for line in lines:
             if line.startswith('SENTIMENT:'):
@@ -269,9 +277,9 @@ async def analyze_message_sentiment(message: str) -> dict:
                 analysis['keywords'] = [k.strip() for k in keywords.split(',') if k.strip()]
             elif line.startswith('CUSTOMER_INTENT:'):
                 analysis['customer_intent'] = line.replace('CUSTOMER_INTENT:', '').strip()
-        
+
         return analysis
-    
+
     except Exception as e:
         return {
             'sentiment': 'neutral',
