@@ -1,48 +1,42 @@
 # SMS Outreach Backend
 
-AI-powered SMS outreach system built with FastAPI, integrating Firebase Firestore, Twilio SMS, and OpenAI for intelligent customer communication.
+**AI-powered SMS conversation system for NextGen MedSpa** - Staff initiate conversations, AI maintains them automatically, and human staff intervene only when needed.
 
-## Features
+## 🎯 What This App Does
 
-- **Customer Management**: CRUD operations with tags, notes, and visit tracking
-- **AI Message Generation**: OpenAI-powered personalized SMS composition with 7 message types
-- **SMS Integration**: Twilio webhook handling for inbound/outbound messages
-- **Intelligent Auto-Replies**: Automated responses with escalation logic
-- **Message Types**: Welcome, follow-up, reminder, promotional, support, thank-you, appointment
-- **Demo Mode**: Generate AI responses without sending SMS for testing
-- **RESTful API**: FastAPI with authentication and validation
+Your staff starts SMS conversations with customers, and AI continues the conversation automatically until the customer is satisfied or human intervention is needed.
 
-## Architecture
+**Key Features:**
+- **Staff-Initiated Conversations**: Start personalized SMS conversations with customers
+- **Automatic AI Responses**: AI handles customer replies without staff involvement  
+- **Smart Escalation**: AI knows when to stop and alert staff for complex issues
+- **Manual Override**: Staff can intervene and send manual messages at any time
+- **NextGen MedSpa Integration**: Tailored for medical spa services and treatments
 
-- **Backend**: FastAPI with async support
-- **Database**: Firebase Firestore
-- **SMS**: Twilio Python SDK
-- **AI**: OpenAI GPT integration
-- **Auth**: API key authentication
+## 🎮 Live Demo
 
-## Prerequisites
+**Want to see how it works?** Check out the interactive demo UI:
 
-You'll need accounts and API keys for:
-- **Firebase** (Firestore database)
-- **Twilio** (SMS functionality) 
-- **OpenAI** (AI message generation)
+```bash
+python3 run_demo.py
+```
 
-## Setup
+The demo shows the complete workflow: adding customers, starting AI conversations, mocking customer responses, and manual staff intervention. No real SMS needed!
 
-### 1. Create Virtual Environment
+## 🚀 Quick Start
+
+### 1. Install Dependencies
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-### 2. Install Dependencies
-
-```bash
 pip install -r requirements.txt
+
+# For demo UI:
+cd jank_ui && npm install
 ```
 
-### 3. Environment Configuration
+### 2. Configure Environment
 
 Create a `.env` file with your service credentials:
 
@@ -63,146 +57,103 @@ OPENAI_API_KEY=your_openai_api_key
 API_KEY=your_secure_api_key_here
 ```
 
-### 4. Firebase Setup
-
-1. Create a Firebase project and enable Firestore
-2. Generate a service account key (JSON file)
-3. Save as `firebase-service-account.json` in project root
-4. Update `FIREBASE_PROJECT_ID` in `.env`
-
-### 5. Run Development Server
+### 3. Run Development Server
 
 ```bash
 python run_dev.py
 ```
 
-API available at `http://localhost:8000`
-Interactive docs at `http://localhost:8000/docs`
+API available at `http://localhost:8000` with interactive docs at `/docs`
 
-## Testing
-
-### Quick Test Options
-
-```bash
-# Run default development suite (fast, works everywhere)
-python3 run_tests.py
-
-# Run specific test categories
-python3 run_tests.py --unit                    # Fast unit tests only
-python3 run_tests.py --integration-graceful    # Integration tests (mocked external services)
-python3 run_tests.py --integration-real        # Integration tests (real external services)
-python3 run_tests.py --utils                   # Utility tests only
-python3 run_tests.py --performance             # Performance tests only
-```
-
-### Test Categories Explained
-
-**🚀 Unit Tests** - Fast, all dependencies mocked
-- `tests/test_main.py` - Core API endpoints and authentication
-- `tests/test_unit_mocked.py` - New SMS endpoints with heavy mocking
-- Both complement each other, run together for full unit coverage
-
-**🔗 Integration Tests** - **Choose one approach:**
-- `tests/test_integration.py` - **Graceful/Mocked** (mocks database, AI, SMS calls)
-- `tests/test_integration_real.py` - **Real Services** (actually hits database, AI, SMS)
-- **For Development/CI**: Use `--integration-graceful` (fast, no API keys needed)
-- **For Production Testing**: Use `--integration-real` (requires Firebase, OpenAI, Twilio)
-
-**🛠️ Utility Tests** - Core functionality and validation
-- `tests/test_utils.py` - Database, models, and utility functions
-
-**⚡ Performance Tests** - Speed and load testing
-- `tests/test_performance.py` - API response times and concurrent load
-
-### Common Development Workflows
-
-```bash
-# 🏃 Default development suite (fast, works everywhere, ~25 seconds)
-python3 run_tests.py
-
-# ⚡ Quick unit tests only (super fast, ~1 second)
-python3 run_tests.py --unit
-
-# 🔍 Test with real services (production readiness, ~45 seconds)
-python3 run_tests.py --unit --integration-real --utils
-
-# 📈 Full production check with performance (requires API keys, ~1 minute)
-python3 run_tests.py --unit --integration-real --utils --performance
-
-# 🎯 Just test your new feature integration
-python3 run_tests.py --integration-graceful
-```
-
-### Manual Test Commands
-
-If you prefer running tests manually:
-
-```bash
-# Fast unit tests (recommended for development)
-python3 -m pytest tests/test_main.py tests/test_unit_mocked.py -v
-
-# Integration tests - graceful/mocked (works without external services)
-python3 -m pytest tests/test_integration.py -v
-
-# Integration tests - real services (requires API keys)
-python3 -m pytest tests/test_integration_real.py -v
-
-# Utility and validation tests
-python3 -m pytest tests/test_utils.py -v
-
-# Performance tests
-python3 -m pytest tests/test_performance.py -v
-```
-
-## API Endpoints
+## 📱 API Endpoints Overview
 
 All endpoints require API key authentication via `X-API-Key` header.
 
-### Customers
-- `GET /customers` - List customers
-- `POST /customers` - Create customer  
-- `GET /customers/{id}` - Get customer
-- `PUT /customers/{id}` - Update customer
-- `DELETE /customers/{id}` - Delete customer
+### Core Conversation Flow
 
-### Messages
-- `GET /messages` - List messages
-- `POST /messages/send` - Generate AI message and send SMS
-- `POST /messages/manual` - Create manual message record
-- `POST /messages/incoming` - Twilio webhook (no auth required)
-- `POST /messages/initial/sms` - Send initial SMS with AI generation
-- `POST /messages/initial/demo` - Generate initial demo message (no SMS)
-- `POST /messages/ongoing/sms` - Send ongoing SMS response
-- `POST /messages/ongoing/demo` - Generate ongoing demo response (no SMS)
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /messages/initial/sms` | **Start conversation** with customer |
+| `POST /messages/incoming` | **Handle customer replies** (Twilio webhook) |
+| `POST /messages/manual` | **Staff sends manual message** |
+| `GET /messages` | **View conversation history** |
 
-## Project Structure
+### Demo & Testing
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /messages/initial/demo` | **Test AI messages** without SMS |
+| `POST /messages/ongoing/demo` | **Test AI responses** with chat history |
+
+### Customer Management
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /customers` | **Create customer** |
+| `GET /customers` | **List customers** |
+| `GET /customers/{id}` | **Get customer details** |
+| `PUT /customers/{id}` | **Update customer** |
+
+## 🤖 AI Message Types
+
+The AI can generate 7 types of personalized messages:
+
+- **`welcome`** - New customer greeting
+- **`follow-up`** - Post-treatment check-in  
+- **`reminder`** - Appointment reminders
+- **`promotional`** - Special offers
+- **`support`** - Help with questions
+- **`thank-you`** - Gratitude messages
+- **`appointment`** - Scheduling related
+
+## 🚨 Auto-Escalation System
+
+AI automatically stops responding and alerts staff when it detects:
+- Angry or frustrated customers
+- Medical concerns or side effects
+- Billing disputes or refund requests
+- Complex scheduling issues
+- "Do not contact" requests (complete silence)
+
+## 📊 Testing
+
+```bash
+python3 run_tests.py
+```
+
+Use `-h` for additional test options and categories.
+
+## 📁 Project Structure
 
 ```
 sms_app/
 ├── app/
 │   ├── main.py              # FastAPI app and middleware
 │   ├── database.py          # Firebase initialization  
-│   ├── models.py            # Pydantic data models
+│   ├── models.py            # Data models and validation
 │   ├── routes/
-│   │   ├── customers.py     # Customer CRUD endpoints
-│   │   └── messages.py      # Message and SMS endpoints
+│   │   ├── customers.py     # Customer management endpoints
+│   │   └── messages.py      # SMS and conversation endpoints
 │   └── utils/
 │       ├── twilio_client.py # SMS functionality
-│       └── llm_client.py    # OpenAI integration
-├── tests/                   # Comprehensive test suite
-├── requirements.txt         # Python dependencies
+│       └── llm_client.py    # AI message generation
+├── jank_ui/                 # React demo UI
+├── tests/                   # Test suite
+├── business_config.txt      # NextGen MedSpa configuration
+├── requirements.txt         # Dependencies
 └── .env                     # Environment variables
 ```
 
-## Dependencies
+## 🔗 Frontend Integration
 
-- **FastAPI**: Web framework with automatic API documentation
-- **Firebase Admin SDK**: Firestore database integration
-- **Twilio SDK**: SMS sending and webhook handling  
-- **OpenAI SDK**: AI-powered message generation
-- **Pydantic**: Data validation and serialization
-- **pytest**: Comprehensive testing framework
+For detailed frontend integration examples, conversation flows, and demo UI architecture, see:
 
-## License
+**[📖 Frontend Integration Guide](FRONTEND_GUIDE.md)**
 
-This project is provided as-is for educational and commercial use.
+## 🛠️ Dependencies
+
+- **FastAPI** - Web framework
+- **Firebase Admin SDK** - Database
+- **Twilio** - SMS messaging
+- **OpenAI** - AI message generation
+- **React** - Demo UI framework

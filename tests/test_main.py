@@ -316,11 +316,12 @@ REASON: Simple greeting, can be handled automatically"""
         mock_openai.chat.completions.create = AsyncMock(return_value=mock_response)
         
         customer_data = {"name": "John Doe", "phone": "+1234567890"}
-        reply, escalate = await generate_auto_reply("Hello!", customer_data, [])
+        reply, escalate, is_do_not_contact = await generate_auto_reply("Hello!", customer_data, [])
         
         assert reply is not None
         assert "Thanks for your message" in reply
         assert escalate is False
+        assert is_do_not_contact is False
 
 class TestTwilioIntegration:
     """Test Twilio-related functionality."""

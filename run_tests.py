@@ -54,12 +54,8 @@ def get_test_suites():
         ],
         "integration": [
             {
-                "name": "Integration Tests (Graceful)",
+                "name": "Integration Tests",
                 "cmd": ["python3", "-m", "pytest", "tests/test_integration.py", "-v"]
-            },
-            {
-                "name": "Integration Tests (Real Services)",
-                "cmd": ["python3", "-m", "pytest", "tests/test_integration_real.py", "-v"]
             }
         ],
         "utils": [
@@ -80,8 +76,7 @@ def main():
     """Run test suites based on arguments."""
     parser = argparse.ArgumentParser(description="SMS Outreach Backend Test Runner")
     parser.add_argument("--unit", action="store_true", help="Run unit tests only (fast, mocked)")
-    parser.add_argument("--integration-graceful", action="store_true", help="Run graceful integration tests (works without external services)")
-    parser.add_argument("--integration-real", action="store_true", help="Run real integration tests (requires API keys)")
+    parser.add_argument("--integration", action="store_true", help="Run integration tests (Firebase + OpenAI + Twilio)")
     parser.add_argument("--utils", action="store_true", help="Run utility tests only")
     parser.add_argument("--performance", action="store_true", help="Run performance tests only")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed test output")
@@ -94,29 +89,25 @@ def main():
     
     if args.unit:
         selected_suites.extend(all_suites["unit"])
-    if args.integration_graceful:
-        selected_suites.append(all_suites["integration"][0])  # Graceful only
-    if args.integration_real:
-        selected_suites.append(all_suites["integration"][1])  # Real only
+    if args.integration:
+        selected_suites.extend(all_suites["integration"])
     if args.utils:
         selected_suites.extend(all_suites["utils"])
     if args.performance:
         selected_suites.extend(all_suites["performance"])
     
     # If no specific flags, run a sensible default for development
-    if not any([args.unit, args.integration_graceful, args.integration_real, args.utils, args.performance]):
+    if not any([args.unit, args.integration, args.utils, args.performance]):
         print("🚀 SMS Outreach Backend Test Runner")
-        print("Running default development suite: Unit + Graceful Integration + Utils")
+        print("Running default development suite: Unit + Utils")
         print("(Use --help for specific categories)")
         selected_suites.extend(all_suites["unit"])
-        selected_suites.append(all_suites["integration"][0])  # Graceful only
         selected_suites.extend(all_suites["utils"])
     else:
         print("🚀 SMS Outreach Backend Test Runner")
         categories = []
         if args.unit: categories.append("Unit")
-        if args.integration_graceful: categories.append("Integration (Graceful)")
-        if args.integration_real: categories.append("Integration (Real)")
+        if args.integration: categories.append("Integration")
         if args.utils: categories.append("Utils")
         if args.performance: categories.append("Performance")
         print(f"Running {', '.join(categories)} tests only")

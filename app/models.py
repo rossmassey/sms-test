@@ -112,6 +112,13 @@ class OngoingDemoRequest(BaseModel):
     context: Optional[str] = Field(None, description="Additional context for response generation")
 
 
+class ManualMessageRequest(BaseModel):
+    """Model for sending manual staff messages via SMS."""
+    phone: str = Field(..., min_length=1, description="Customer phone number")
+    message_content: str = Field(..., min_length=1, description="Staff message content")
+    re_enable_ai: bool = Field(default=False, description="Whether to re-enable AI auto-reply after this message")
+
+
 class MessageResponse(BaseModel):
     """Response model for message operations."""
     success: bool = Field(..., description="Whether the operation was successful")

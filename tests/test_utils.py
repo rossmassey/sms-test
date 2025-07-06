@@ -77,10 +77,11 @@ REASON: Simple hours inquiry, can be handled automatically"""
         customer_data = {"name": "Jane", "phone": "+1987654321"}
         incoming_message = "What are your hours?"
         
-        reply, escalate = await generate_auto_reply(incoming_message, customer_data, [])
+        reply, escalate, is_do_not_contact = await generate_auto_reply(incoming_message, customer_data, [])
         
         assert reply == "Thanks for your message! We're open Monday-Friday 9-5."
         assert escalate is False
+        assert is_do_not_contact is False
     
     @patch('app.utils.llm_client.openai_client')
     async def test_generate_auto_reply_needs_escalation(self, mock_openai):
@@ -99,10 +100,11 @@ REASON: Simple hours inquiry, can be handled automatically"""
         customer_data = {"name": "Angry Customer", "phone": "+1111111111"}
         incoming_message = "I'm very upset about my service! This is unacceptable!"
         
-        reply, escalate = await generate_auto_reply(incoming_message, customer_data, [])
+        reply, escalate, is_do_not_contact = await generate_auto_reply(incoming_message, customer_data, [])
         
         assert reply is None
         assert escalate is True
+        assert is_do_not_contact is False
     
     @patch('app.utils.llm_client.openai_client')
     async def test_generate_auto_reply_error_handling(self, mock_openai):
@@ -114,11 +116,12 @@ REASON: Simple hours inquiry, can be handled automatically"""
         
         customer_data = {"name": "Test", "phone": "+1234567890"}
         
-        reply, escalate = await generate_auto_reply("Test message", customer_data, [])
+        reply, escalate, is_do_not_contact = await generate_auto_reply("Test message", customer_data, [])
         
         # Should escalate on error for safety
         assert reply is None
         assert escalate is True
+        assert is_do_not_contact is False
     
     @patch('app.utils.llm_client.openai_client')
     async def test_analyze_message_sentiment(self, mock_openai):

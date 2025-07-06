@@ -12,12 +12,12 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 from ..database import get_messages_collection, get_customers_collection
 from ..models import (
     Message, MessageCreate, MessageSend, IncomingWebhook, APIResponse,
-    InitialSMSRequest, InitialDemoRequest, OngoingSMSRequest, 
-    OngoingDemoRequest, MessageResponse
+    InitialSMSRequest, InitialDemoRequest, OngoingSMSRequest,
+    OngoingDemoRequest, MessageResponse, ManualMessageRequest
 )
 from ..utils.llm_client import (
     generate_outbound_message, generate_auto_reply, generate_initial_message,
-    generate_ongoing_response, generate_demo_response
+    generate_ongoing_response, generate_demo_response, generate_escalation_message
 )
 from ..utils.twilio_client import send_sms, verify_webhook_signature
 
@@ -89,7 +89,7 @@ async def list_messages(
                     # Log the error but continue processing other messages
                     print(f"Skipping invalid message {doc.id}: {validation_error}")
                     continue
-            
+
             # Sort by timestamp in Python and apply pagination
             messages.sort(key=lambda x: x.timestamp, reverse=True)
             messages = messages[offset:offset + limit]
@@ -196,6 +196,84 @@ async def create_manual_message(message: MessageCreate):
         raise HTTPException(status_code=500, detail=f"Error creating message: {str(e)}")
 
 
+@router.post("/manual/send", response_model=MessageResponse)
+async def send_manual_message(request: ManualMessageRequest):
+    """
+    Send a manual staff message via SMS with option to re-enable AI auto-reply.
+    """
+    try:
+        customers_ref = get_customers_collection()
+
+        # Find customer by phone number
+        customer_query = customers_ref.where(filter=FieldFilter("phone", "==", request.phone))
+        customer_docs = list(customer_query.stream())
+
+        if not customer_docs:
+            raise HTTPException(status_code=404, detail="Customer not found with this phone number")
+
+        customer_doc = customer_docs[0]
+        customer_id = customer_doc.id
+        customer_data = customer_doc.to_dict()
+
+        # Send SMS
+        message_sid = None
+        try:
+            message_sid = await send_sms(
+                to_phone=request.phone,
+                message_body=request.message_content
+            )
+        except Exception as twilio_error:
+            print(f"Twilio error: {twilio_error}")
+            message_sid = "NOT_SENT_TWILIO_ERROR"
+
+        # Save manual message to database
+        messages_ref = get_messages_collection()
+        message_data = {
+            'customer_id': customer_id,
+            'direction': 'outbound',
+            'content': request.message_content,
+            'source': 'ai' if request.re_enable_ai else 'manual',  # Use 'ai' source to re-enable auto-reply
+            'escalation': False,
+            'timestamp': datetime.utcnow(),
+            'twilio_sid': message_sid
+        }
+
+        message_ref = messages_ref.add(message_data)[1]
+
+        # If AI is being re-enabled, clear escalation flags from conversation history
+        if request.re_enable_ai:
+            # Update all escalated messages in this conversation to clear escalation flag
+            escalated_messages_query = messages_ref.where(filter=FieldFilter("customer_id", "==", customer_id)).where(
+                filter=FieldFilter("escalation", "==", True))
+            escalated_docs = list(escalated_messages_query.stream())
+
+            for doc in escalated_docs:
+                doc.reference.update({'escalation': False})
+
+            print(f"Cleared escalation flags from {len(escalated_docs)} messages for customer {customer_id}")
+
+        status_message = "Manual message sent successfully"
+        if message_sid == "NOT_SENT_TWILIO_ERROR":
+            status_message = "Manual message saved (SMS not sent - Twilio not configured)"
+
+        if request.re_enable_ai:
+            status_message += " and AI auto-reply re-enabled"
+
+        return MessageResponse(
+            success=True,
+            message=status_message,
+            response_content=None,
+            message_id=message_ref.id,
+            customer_id=customer_id,
+            twilio_sid=message_sid
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error sending manual message: {str(e)}")
+
+
 @router.post("/initial/sms", response_model=MessageResponse)
 async def send_initial_sms(request: InitialSMSRequest):
     """
@@ -204,11 +282,11 @@ async def send_initial_sms(request: InitialSMSRequest):
     """
     try:
         customers_ref = get_customers_collection()
-        
+
         # Find customer by phone number
         customer_query = customers_ref.where(filter=FieldFilter("phone", "==", request.phone))
         customer_docs = list(customer_query.stream())
-        
+
         if customer_docs:
             # Customer exists, use existing customer
             customer_doc = customer_docs[0]
@@ -309,14 +387,14 @@ async def send_ongoing_sms(request: OngoingSMSRequest):
     """
     try:
         customers_ref = get_customers_collection()
-        
+
         # Find customer by phone number
         customer_query = customers_ref.where(filter=FieldFilter("phone", "==", request.phone))
         customer_docs = list(customer_query.stream())
-        
+
         if not customer_docs:
             raise HTTPException(status_code=404, detail="Customer not found with this phone number")
-        
+
         customer_doc = customer_docs[0]
         customer_id = customer_doc.id
         customer_data = customer_doc.to_dict()
@@ -327,7 +405,7 @@ async def send_ongoing_sms(request: OngoingSMSRequest):
         # Query without ordering to avoid composite index requirement
         history_query = messages_ref.where(filter=FieldFilter("customer_id", "==", customer_id))
         history_docs = list(history_query.stream())
-        
+
         # Convert to message history format and sort in Python
         message_history = []
         for doc in history_docs:
@@ -335,13 +413,23 @@ async def send_ongoing_sms(request: OngoingSMSRequest):
             message_history.append({
                 'direction': msg_data.get('direction'),
                 'content': msg_data.get('content'),
-                'timestamp': msg_data.get('timestamp')
+                'timestamp': msg_data.get('timestamp'),
+                'source': msg_data.get('source'),
+                'escalation': msg_data.get('escalation', False)
             })
-        
+
         # Sort by timestamp in Python and take last 10
         message_history.sort(key=lambda x: x.get('timestamp', datetime.min), reverse=True)
         message_history = message_history[:10]
         message_history.reverse()  # Reverse to get chronological order
+
+        # Check for escalation using AI analysis
+        from ..utils.llm_client import generate_auto_reply
+        _, should_escalate, is_do_not_contact = await generate_auto_reply(
+            incoming_message=request.message_content,
+            customer_data=customer_data,
+            message_history=message_history
+        )
 
         # Save the incoming user message first
         user_message_data = {
@@ -349,51 +437,151 @@ async def send_ongoing_sms(request: OngoingSMSRequest):
             'direction': 'inbound',
             'content': request.message_content,
             'source': 'manual',
-            'escalation': False,
+            'escalation': should_escalate,
             'timestamp': datetime.utcnow()
         }
-        messages_ref.add(user_message_data)
+        user_message_ref = messages_ref.add(user_message_data)[1]
 
-        # Generate AI response
-        ai_response = await generate_ongoing_response(
-            incoming_message=request.message_content,
-            customer_data=customer_data,
-            message_history=message_history,
-            context=request.context
-        )
+        # Check if we should auto-reply
+        should_auto_reply = not should_escalate
 
-        # Send SMS response
-        message_sid = None
-        try:
-            message_sid = await send_sms(
-                to_phone=request.phone,
-                message_body=ai_response
+        # Check if conversation is already escalated (any message has escalation=true)
+        conversation_escalated = any(msg.get('escalation', False) for msg in message_history)
+
+        # Check if last outbound message was manual (staff took over)
+        last_outbound_was_manual = False
+        if message_history:
+            # Find the most recent outbound message
+            for msg in reversed(message_history):
+                if msg.get('direction') == 'outbound':
+                    if msg.get('source') == 'manual':
+                        last_outbound_was_manual = True
+                        print(f"Auto-reply disabled: last outbound message was manual from staff")
+                    break
+
+        # Don't auto-reply if conversation is escalated OR if staff took over
+        if conversation_escalated or last_outbound_was_manual:
+            should_auto_reply = False
+            print(
+                f"Auto-reply disabled: conversation_escalated={conversation_escalated}, last_outbound_was_manual={last_outbound_was_manual}")
+
+        if should_auto_reply:
+            # Generate AI response
+            ai_response = await generate_ongoing_response(
+                incoming_message=request.message_content,
+                customer_data=customer_data,
+                message_history=message_history,
+                context=request.context
             )
-        except Exception as twilio_error:
-            print(f"Twilio error: {twilio_error}")
-            message_sid = "NOT_SENT_TWILIO_ERROR"
 
-        # Save AI response message
-        response_message_data = {
-            'customer_id': customer_id,
-            'direction': 'outbound',
-            'content': ai_response,
-            'source': 'ai',
-            'escalation': False,
-            'timestamp': datetime.utcnow(),
-            'twilio_sid': message_sid
-        }
+            # Send SMS response
+            message_sid = None
+            try:
+                message_sid = await send_sms(
+                    to_phone=request.phone,
+                    message_body=ai_response
+                )
+            except Exception as twilio_error:
+                print(f"Twilio error: {twilio_error}")
+                message_sid = "NOT_SENT_TWILIO_ERROR"
 
-        response_message_ref = messages_ref.add(response_message_data)[1]
+            # Save AI response message
+            response_message_data = {
+                'customer_id': customer_id,
+                'direction': 'outbound',
+                'content': ai_response,
+                'source': 'ai',
+                'escalation': False,
+                'timestamp': datetime.utcnow(),
+                'twilio_sid': message_sid
+            }
 
-        return MessageResponse(
-            success=True,
-            message="SMS response sent successfully" if message_sid != "NOT_SENT_TWILIO_ERROR" else "Response generated (SMS not sent - Twilio not configured)",
-            response_content=None,  # SMS mode doesn't return content
-            message_id=response_message_ref.id,
-            customer_id=customer_id,
-            twilio_sid=message_sid
-        )
+            response_message_ref = messages_ref.add(response_message_data)[1]
+
+            return MessageResponse(
+                success=True,
+                message="SMS response sent successfully" if message_sid != "NOT_SENT_TWILIO_ERROR" else "Response generated (SMS not sent - Twilio not configured)",
+                response_content=None,  # SMS mode doesn't return content
+                message_id=response_message_ref.id,
+                customer_id=customer_id,
+                twilio_sid=message_sid
+            )
+        else:
+            # Handle escalation vs staff takeover differently
+            if should_escalate:
+                # Mark for escalation and send acknowledgment only if not a "do not contact" request
+                user_message_ref.update({'escalation': True})
+
+                # Don't send acknowledgment if conversation was already escalated
+                if conversation_escalated:
+                    return MessageResponse(
+                        success=True,
+                        message="Message saved and escalated (conversation already escalated - no additional acknowledgment sent)",
+                        response_content=None,
+                        message_id=user_message_ref.id,
+                        customer_id=customer_id,
+                        twilio_sid=None
+                    )
+
+                if not is_do_not_contact:
+                    # Send escalation acknowledgment message
+                    escalation_message = await generate_escalation_message(
+                        incoming_message=request.message_content,
+                        customer_name=customer_data.get('name', 'Customer')
+                    )
+
+                    # Send escalation acknowledgment SMS
+                    escalation_sid = None
+                    try:
+                        escalation_sid = await send_sms(
+                            to_phone=request.phone,
+                            message_body=escalation_message
+                        )
+                    except Exception as twilio_error:
+                        print(f"Twilio error sending escalation message: {twilio_error}")
+                        escalation_sid = "NOT_SENT_TWILIO_ERROR"
+
+                    # Save escalation acknowledgment message
+                    escalation_data = {
+                        'customer_id': customer_id,
+                        'direction': 'outbound',
+                        'content': escalation_message,
+                        'source': 'ai',
+                        'escalation': False,  # The acknowledgment itself isn't escalated
+                        'timestamp': datetime.utcnow(),
+                        'twilio_sid': escalation_sid
+                    }
+                    escalation_message_ref = messages_ref.add(escalation_data)[1]
+
+                    return MessageResponse(
+                        success=True,
+                        message="Message escalated and acknowledgment sent to customer" if escalation_sid != "NOT_SENT_TWILIO_ERROR" else "Message escalated and acknowledgment saved (SMS not sent - Twilio not configured)",
+                        response_content=None,
+                        message_id=escalation_message_ref.id,
+                        customer_id=customer_id,
+                        twilio_sid=escalation_sid
+                    )
+                else:
+                    # Do not contact request - escalate but don't send acknowledgment
+                    print(f"Do not contact request from {request.phone} - escalating without acknowledgment")
+                    return MessageResponse(
+                        success=True,
+                        message="Message escalated (do not contact request - no acknowledgment sent)",
+                        response_content=None,
+                        message_id=user_message_ref.id,
+                        customer_id=customer_id,
+                        twilio_sid=None
+                    )
+            else:
+                # Staff took over conversation
+                return MessageResponse(
+                    success=True,
+                    message="Message saved but no auto-reply sent (staff has taken over conversation)",
+                    response_content=None,
+                    message_id=user_message_ref.id,
+                    customer_id=customer_id,
+                    twilio_sid=None
+                )
 
     except HTTPException:
         raise
@@ -481,15 +669,59 @@ async def handle_incoming_sms(request: Request):
 
         message_ref = messages_ref.add(message_data)[1]
 
+        # Get recent message history for context and auto-reply logic
+        history_query = messages_ref.where(filter=FieldFilter("customer_id", "==", customer_id))
+        history_docs = list(history_query.stream())
+
+        # Convert to message history format and sort
+        message_history = []
+        for doc in history_docs:
+            msg_data = doc.to_dict()
+            message_history.append({
+                'direction': msg_data.get('direction'),
+                'content': msg_data.get('content'),
+                'timestamp': msg_data.get('timestamp'),
+                'source': msg_data.get('source'),
+                'escalation': msg_data.get('escalation', False)
+            })
+
+        # Sort by timestamp and take last 10
+        message_history.sort(key=lambda x: x.get('timestamp', datetime.min), reverse=True)
+        message_history = message_history[:10]
+        message_history.reverse()
+
         # Generate AI auto-reply
         try:
-            auto_reply, should_escalate = await generate_auto_reply(
+            auto_reply, should_escalate, is_do_not_contact = await generate_auto_reply(
                 incoming_message=webhook_data.Body,
                 customer_data=customer_data,
-                message_history=[]  # TODO: Fetch recent message history
+                message_history=message_history
             )
 
-            if auto_reply and not should_escalate:
+            # Check if we should auto-reply
+            should_auto_reply = auto_reply and not should_escalate
+
+            # Check if conversation is already escalated (any message has escalation=true)
+            conversation_escalated = any(msg.get('escalation', False) for msg in message_history)
+
+            # Check if last outbound message was manual (staff took over)
+            last_outbound_was_manual = False
+            if message_history:
+                # Find the most recent outbound message
+                for msg in reversed(message_history):
+                    if msg.get('direction') == 'outbound':
+                        if msg.get('source') == 'manual':
+                            last_outbound_was_manual = True
+                            print(f"Auto-reply disabled: last outbound message was manual from staff")
+                        break
+
+            # Don't auto-reply if conversation is escalated OR if staff took over
+            if conversation_escalated or last_outbound_was_manual:
+                should_auto_reply = False
+                print(
+                    f"Auto-reply disabled: conversation_escalated={conversation_escalated}, last_outbound_was_manual={last_outbound_was_manual}")
+
+            if should_auto_reply:
                 # Send auto-reply
                 reply_sid = await send_sms(
                     to_phone=webhook_data.From,
@@ -509,8 +741,44 @@ async def handle_incoming_sms(request: Request):
                 messages_ref.add(reply_data)
 
             elif should_escalate:
-                # Mark for escalation
+                # Mark for escalation and send acknowledgment only if not a "do not contact" request
                 message_ref.update({'escalation': True})
+
+                # Don't send acknowledgment if conversation was already escalated
+                if conversation_escalated:
+                    print(f"Conversation already escalated - not sending additional acknowledgment")
+                elif not is_do_not_contact:
+                    # Send escalation acknowledgment message
+                    escalation_message = await generate_escalation_message(
+                        incoming_message=webhook_data.Body,
+                        customer_name=customer_data.get('name', 'Customer')
+                    )
+
+                    # Send escalation acknowledgment SMS
+                    escalation_sid = None
+                    try:
+                        escalation_sid = await send_sms(
+                            to_phone=webhook_data.From,
+                            message_body=escalation_message
+                        )
+                    except Exception as twilio_error:
+                        print(f"Twilio error sending escalation message: {twilio_error}")
+                        escalation_sid = "NOT_SENT_TWILIO_ERROR"
+
+                    # Save escalation acknowledgment message
+                    escalation_data = {
+                        'customer_id': customer_id,
+                        'direction': 'outbound',
+                        'content': escalation_message,
+                        'source': 'ai',
+                        'escalation': False,  # The acknowledgment itself isn't escalated
+                        'timestamp': datetime.utcnow(),
+                        'twilio_sid': escalation_sid
+                    }
+                    messages_ref.add(escalation_data)
+                else:
+                    # Do not contact request - escalate but don't send acknowledgment
+                    print(f"Do not contact request from {webhook_data.From} - escalating without acknowledgment")
 
         except Exception as e:
             # Log auto-reply error but don't fail the webhook
