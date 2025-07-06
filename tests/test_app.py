@@ -96,10 +96,10 @@ async def app_lifespan(app):
     # Don't initialize Firebase for tests
     yield
 
-# Create test FastAPI app with mocked modules
+# Create mock FastAPI app with mocked modules
 customers, messages, verify_api_key = get_mocked_app_modules()
 
-test_app = FastAPI(
+mock_app = FastAPI(
     title="SMS Outreach Backend (Test)",
     description="AI-powered SMS outreach backend with Firebase and Twilio integration (Test Mode)",
     version="1.0.0",
@@ -108,7 +108,7 @@ test_app = FastAPI(
 
 # Add CORS middleware
 from fastapi.middleware.cors import CORSMiddleware
-test_app.add_middleware(
+mock_app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
@@ -117,7 +117,7 @@ test_app.add_middleware(
 )
 
 # Health check endpoint
-@test_app.get("/")
+@mock_app.get("/")
 async def health_check():
     """Health check endpoint."""
     return {
@@ -127,14 +127,14 @@ async def health_check():
     }
 
 # Include routers with authentication
-test_app.include_router(
+mock_app.include_router(
     customers.router, 
     prefix="/customers", 
     tags=["customers"],
     dependencies=[Depends(verify_api_key)]
 )
 
-test_app.include_router(
+mock_app.include_router(
     messages.router, 
     prefix="/messages", 
     tags=["messages"],

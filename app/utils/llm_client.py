@@ -3,7 +3,7 @@ OpenAI LLM client utilities for message composition and auto-replies.
 """
 
 import os
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
 
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
@@ -77,6 +77,52 @@ ESCALATE: [true/false]
 REASON: [brief explanation]
 """
 
+# Message type templates for different types of initial messages
+MESSAGE_TYPE_TEMPLATES = {
+    "welcome": """
+Generate a warm welcome message for new customer {customer_name}.
+This is their first interaction with our business.
+Context: {context}
+Keep it friendly, welcoming, and under 160 characters.
+""",
+    "follow-up": """
+Generate a follow-up message for customer {customer_name}.
+This is to check in after their recent interaction or visit.
+Context: {context}
+Keep it caring, professional, and under 160 characters.
+""",
+    "reminder": """
+Generate a reminder message for customer {customer_name}.
+This is to remind them about something important.
+Context: {context}
+Keep it helpful, clear, and under 160 characters.
+""",
+    "promotional": """
+Generate a promotional message for customer {customer_name}.
+This is to inform them about a special offer or promotion.
+Context: {context}
+Keep it exciting, valuable, and under 160 characters.
+""",
+    "support": """
+Generate a support message for customer {customer_name}.
+This is to help them with a question or issue.
+Context: {context}
+Keep it helpful, clear, and under 160 characters.
+""",
+    "thank-you": """
+Generate a thank you message for customer {customer_name}.
+This is to express gratitude for their business or action.
+Context: {context}
+Keep it warm, genuine, and under 160 characters.
+""",
+    "appointment": """
+Generate an appointment-related message for customer {customer_name}.
+This could be confirmation, reminder, or scheduling.
+Context: {context}
+Keep it clear, professional, and under 160 characters.
+"""
+}
+
 
 async def generate_outbound_message(
         customer_data: dict,
@@ -148,6 +194,71 @@ async def generate_outbound_message(
         raise Exception(f"Error generating outbound message: {str(e)}")
 
 
+async def generate_initial_message(
+        customer_name: str,
+        message_type: str,
+        context: Optional[str] = None
+) -> str:
+    """
+    Generate an initial AI message based on customer name and message type.
+    
+    Args:
+        customer_name: Name of the customer
+        message_type: Type of message (welcome, follow-up, reminder, etc.)
+        context: Additional context for message generation
+    
+    Returns:
+        str: Generated SMS message content
+    
+    Raises:
+        Exception: If message generation fails
+    """
+    try:
+        # Get template for message type, use generic if not found
+        template = MESSAGE_TYPE_TEMPLATES.get(message_type, MESSAGE_TYPE_TEMPLATES["welcome"])
+        
+        # Format the prompt
+        prompt = template.format(
+            customer_name=customer_name,
+            context=context or f"General {message_type} message"
+        )
+
+        response = await openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system",
+                 "content": f"You are a helpful customer service AI that generates {message_type} SMS messages."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=150,
+            temperature=0.7
+        )
+
+        message_content = response.choices[0].message.content.strip()
+        
+        # Ensure message isn't too long
+        if len(message_content) > 160:
+            prompt += "\n\nIMPORTANT: The message MUST be under 160 characters."
+
+            response = await openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system",
+                     "content": f"You are a helpful customer service AI. Generate concise {message_type} SMS messages under 160 characters."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=100,
+                temperature=0.7
+            )
+
+            message_content = response.choices[0].message.content.strip()
+
+        return message_content
+
+    except Exception as e:
+        raise Exception(f"Error generating initial message: {str(e)}")
+
+
 async def generate_auto_reply(
         incoming_message: str,
         customer_data: dict,
@@ -202,17 +313,18 @@ async def generate_auto_reply(
 
         # Parse the response
         auto_reply = None
-        should_escalate = True  # Default to escalation for safety
-
+        should_escalate = False
+        
         lines = response_text.split('\n')
         for line in lines:
+            line = line.strip()
             if line.startswith('AUTO_REPLY:'):
-                reply_content = line.replace('AUTO_REPLY:', '').strip()
-                if reply_content and reply_content.upper() != 'NONE':
-                    auto_reply = reply_content
+                reply_text = line.split('AUTO_REPLY:', 1)[1].strip()
+                if reply_text.upper() != 'NONE':
+                    auto_reply = reply_text
             elif line.startswith('ESCALATE:'):
-                escalate_value = line.replace('ESCALATE:', '').strip().lower()
-                should_escalate = escalate_value in ['true', 'yes', '1']
+                escalate_text = line.split('ESCALATE:', 1)[1].strip().lower()
+                should_escalate = escalate_text in ['true', 'yes', '1']
 
         return auto_reply, should_escalate
 
@@ -222,68 +334,258 @@ async def generate_auto_reply(
         return None, True
 
 
-async def analyze_message_sentiment(message: str) -> dict:
+async def generate_ongoing_response(
+        incoming_message: str,
+        customer_data: dict,
+        message_history: List[dict],
+        context: Optional[str] = None
+) -> str:
     """
-    Analyze the sentiment and urgency of a message.
+    Generate a response to an ongoing conversation.
     
     Args:
-        message: The message content to analyze
+        incoming_message: The latest message from the customer
+        customer_data: Dictionary containing customer information
+        message_history: List of conversation history
+        context: Additional context for response generation
     
     Returns:
-        dict: Analysis results including sentiment, urgency, and keywords
+        str: Generated response message
+    
+    Raises:
+        Exception: If response generation fails
     """
     try:
+        # Format message history for context
+        history_text = ""
+        for msg in message_history[-10:]:  # Last 10 messages for context
+            role = "Customer" if msg.get('direction') == 'inbound' else "Assistant"
+            history_text += f"{role}: {msg.get('content', '')}\n"
+
+        if not history_text:
+            history_text = "No previous conversation history"
+
         prompt = f"""
-        Analyze the following SMS message for sentiment, urgency, and key topics:
-        
-        Message: "{message}"
-        
-        Provide analysis in this format:
-        SENTIMENT: [positive/neutral/negative]
-        URGENCY: [low/medium/high]
-        KEYWORDS: [comma-separated key topics]
-        CUSTOMER_INTENT: [brief description of what customer wants]
-        """
+You are a helpful customer service AI assistant. Generate a response to the customer's message.
+
+Customer Information:
+- Name: {customer_data.get('name', 'Customer')}
+- Phone: {customer_data.get('phone', 'N/A')}
+- Notes: {customer_data.get('notes', 'No additional notes')}
+
+Conversation History:
+{history_text}
+
+Latest Customer Message: "{incoming_message}"
+
+Additional Context: {context or 'Ongoing conversation'}
+
+Guidelines:
+- Be helpful and professional
+- Keep response under 160 characters
+- Address the customer's specific question or concern
+- Use their name when appropriate
+- Provide actionable information when possible
+
+Generate only the response message, no additional text.
+"""
 
         response = await openai_client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system",
-                 "content": "You are a message analysis AI that categorizes customer communications."},
+                 "content": "You are a helpful customer service AI that generates appropriate responses to customer messages."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=150,
-            temperature=0.1
+            temperature=0.7
+        )
+
+        message_content = response.choices[0].message.content.strip()
+        
+        # Ensure message isn't too long
+        if len(message_content) > 160:
+            prompt += "\n\nIMPORTANT: The response MUST be under 160 characters."
+
+            response = await openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system",
+                     "content": "You are a helpful customer service AI. Generate concise responses under 160 characters."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=100,
+                temperature=0.7
+            )
+
+            message_content = response.choices[0].message.content.strip()
+
+        return message_content
+
+    except Exception as e:
+        raise Exception(f"Error generating ongoing response: {str(e)}")
+
+
+async def generate_demo_response(
+        incoming_message: str,
+        customer_name: str,
+        message_history: List[Dict[str, Any]],
+        context: Optional[str] = None
+) -> str:
+    """
+    Generate a demo response using provided message history.
+    
+    Args:
+        incoming_message: The latest message from the customer
+        customer_name: Name of the customer
+        message_history: List of conversation history with role and content
+        context: Additional context for response generation
+    
+    Returns:
+        str: Generated response message
+    
+    Raises:
+        Exception: If response generation fails
+    """
+    try:
+        # Format message history for context
+        history_text = ""
+        for msg in message_history[-10:]:  # Last 10 messages for context
+            role = msg.get('role', 'unknown')
+            content = msg.get('content', '')
+            history_text += f"{role.capitalize()}: {content}\n"
+
+        if not history_text:
+            history_text = "No previous conversation history"
+
+        prompt = f"""
+You are a helpful customer service AI assistant. Generate a response to the customer's message.
+
+Customer Name: {customer_name}
+
+Conversation History:
+{history_text}
+
+Latest Customer Message: "{incoming_message}"
+
+Additional Context: {context or 'Demo conversation'}
+
+Guidelines:
+- Be helpful and professional
+- Keep response under 160 characters
+- Address the customer's specific question or concern
+- Use their name when appropriate
+- Provide actionable information when possible
+
+Generate only the response message, no additional text.
+"""
+
+        response = await openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system",
+                 "content": "You are a helpful customer service AI that generates appropriate responses to customer messages."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=150,
+            temperature=0.7
+        )
+
+        message_content = response.choices[0].message.content.strip()
+        
+        # Ensure message isn't too long
+        if len(message_content) > 160:
+            prompt += "\n\nIMPORTANT: The response MUST be under 160 characters."
+
+            response = await openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system",
+                     "content": "You are a helpful customer service AI. Generate concise responses under 160 characters."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=100,
+                temperature=0.7
+            )
+
+            message_content = response.choices[0].message.content.strip()
+
+        return message_content
+
+    except Exception as e:
+        raise Exception(f"Error generating demo response: {str(e)}")
+
+
+async def analyze_message_sentiment(message: str) -> dict:
+    """
+    Analyze the sentiment and urgency of a message.
+    
+    Args:
+        message: The message to analyze
+    
+    Returns:
+        dict: Analysis results with sentiment, urgency, and escalation recommendation
+    
+    Raises:
+        Exception: If analysis fails
+    """
+    try:
+        prompt = f"""
+Analyze the sentiment and urgency of this customer message:
+
+Message: "{message}"
+
+Provide analysis in this format:
+SENTIMENT: [positive/neutral/negative]
+URGENCY: [low/medium/high]
+KEYWORDS: [key words or phrases that indicate emotion/intent]
+CUSTOMER_INTENT: [question/complaint/compliment/request/inquiry]
+ESCALATE: [true/false] (should this be escalated to a human?)
+REASON: [brief explanation of the analysis]
+"""
+
+        response = await openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system",
+                 "content": "You are an AI that analyzes customer messages for sentiment, urgency, and escalation needs."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=150,
+            temperature=0.3
         )
 
         response_text = response.choices[0].message.content.strip()
-
-        # Parse response
+        
+        # Parse the response
         analysis = {
             'sentiment': 'neutral',
-            'urgency': 'medium',
+            'urgency': 'low',
             'keywords': [],
-            'customer_intent': 'Unknown'
+            'customer_intent': 'inquiry',
+            'escalate': False,
+            'reason': ''
         }
-
+        
         lines = response_text.split('\n')
         for line in lines:
+            line = line.strip()
             if line.startswith('SENTIMENT:'):
-                analysis['sentiment'] = line.replace('SENTIMENT:', '').strip().lower()
+                analysis['sentiment'] = line.split('SENTIMENT:', 1)[1].strip().lower()
             elif line.startswith('URGENCY:'):
-                analysis['urgency'] = line.replace('URGENCY:', '').strip().lower()
+                analysis['urgency'] = line.split('URGENCY:', 1)[1].strip().lower()
             elif line.startswith('KEYWORDS:'):
-                keywords = line.replace('KEYWORDS:', '').strip()
-                analysis['keywords'] = [k.strip() for k in keywords.split(',') if k.strip()]
+                keywords_text = line.split('KEYWORDS:', 1)[1].strip()
+                analysis['keywords'] = [k.strip() for k in keywords_text.split(',')]
             elif line.startswith('CUSTOMER_INTENT:'):
-                analysis['customer_intent'] = line.replace('CUSTOMER_INTENT:', '').strip()
+                analysis['customer_intent'] = line.split('CUSTOMER_INTENT:', 1)[1].strip().lower()
+            elif line.startswith('ESCALATE:'):
+                escalate_text = line.split('ESCALATE:', 1)[1].strip().lower()
+                analysis['escalate'] = escalate_text in ['true', 'yes', '1']
+            elif line.startswith('REASON:'):
+                analysis['reason'] = line.split('REASON:', 1)[1].strip()
 
         return analysis
 
     except Exception as e:
-        return {
-            'sentiment': 'neutral',
-            'urgency': 'medium',
-            'keywords': [],
-            'customer_intent': f'Analysis failed: {str(e)}'
-        }
+        raise Exception(f"Error analyzing message sentiment: {str(e)}")

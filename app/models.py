@@ -3,9 +3,9 @@ Pydantic models for Customer and Message data structures.
 """
 
 from datetime import datetime
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class CustomerBase(BaseModel):
@@ -35,8 +35,7 @@ class Customer(CustomerBase):
     """Complete customer model with ID."""
     id: str = Field(..., description="Unique customer identifier")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MessageBase(BaseModel):
@@ -69,8 +68,7 @@ class Message(MessageBase):
     id: str = Field(..., description="Unique message identifier")
     timestamp: datetime = Field(..., description="Message timestamp")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class IncomingWebhook(BaseModel):
@@ -80,9 +78,48 @@ class IncomingWebhook(BaseModel):
     Body: str = Field(..., description="Message body")
     MessageSid: str = Field(..., description="Twilio message SID")
 
-    class Config:
-        # Allow additional fields from Twilio webhook
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
+
+
+# New models for the four new message endpoints
+class InitialSMSRequest(BaseModel):
+    """Model for sending initial SMS messages."""
+    name: str = Field(..., min_length=1, description="Customer name")
+    phone: str = Field(..., min_length=1, description="Customer phone number")
+    message_type: str = Field(..., min_length=1, description="Type of message (welcome, follow-up, reminder, etc.)")
+    context: Optional[str] = Field(None, description="Additional context for message generation")
+
+
+class InitialDemoRequest(BaseModel):
+    """Model for initial demo messages."""
+    name: str = Field(..., min_length=1, description="Customer name")
+    message_type: str = Field(..., min_length=1, description="Type of message (welcome, follow-up, reminder, etc.)")
+    context: Optional[str] = Field(None, description="Additional context for message generation")
+
+
+class OngoingSMSRequest(BaseModel):
+    """Model for ongoing SMS conversation."""
+    phone: str = Field(..., min_length=1, description="Customer phone number")
+    message_content: str = Field(..., min_length=1, description="User's message content")
+    context: Optional[str] = Field(None, description="Additional context for response generation")
+
+
+class OngoingDemoRequest(BaseModel):
+    """Model for ongoing demo conversation."""
+    name: str = Field(..., min_length=1, description="Customer name")
+    message_history: List[Dict[str, Any]] = Field(..., description="Full conversation history")
+    message_content: str = Field(..., min_length=1, description="Latest message content")
+    context: Optional[str] = Field(None, description="Additional context for response generation")
+
+
+class MessageResponse(BaseModel):
+    """Response model for message operations."""
+    success: bool = Field(..., description="Whether the operation was successful")
+    message: str = Field(..., description="Status message")
+    response_content: Optional[str] = Field(None, description="Generated response content (for demo modes)")
+    message_id: Optional[str] = Field(None, description="Message ID in database (for SMS modes)")
+    customer_id: Optional[str] = Field(None, description="Customer ID")
+    twilio_sid: Optional[str] = Field(None, description="Twilio message SID (for SMS modes)")
 
 
 class APIResponse(BaseModel):

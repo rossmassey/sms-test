@@ -5,9 +5,11 @@ AI-powered SMS outreach system built with FastAPI, integrating Firebase Firestor
 ## Features
 
 - **Customer Management**: CRUD operations with tags, notes, and visit tracking
-- **AI Message Generation**: OpenAI-powered personalized SMS composition
+- **AI Message Generation**: OpenAI-powered personalized SMS composition with 7 message types
 - **SMS Integration**: Twilio webhook handling for inbound/outbound messages
 - **Intelligent Auto-Replies**: Automated responses with escalation logic
+- **Message Types**: Welcome, follow-up, reminder, promotional, support, thank-you, appointment
+- **Demo Mode**: Generate AI responses without sending SMS for testing
 - **RESTful API**: FastAPI with authentication and validation
 
 ## Architecture
@@ -79,14 +81,71 @@ Interactive docs at `http://localhost:8000/docs`
 
 ## Testing
 
-Run the complete test suite with these 4 commands:
+### Quick Test Options
 
 ```bash
-# Integration tests (real Firebase)
-python3 -m pytest tests/test_integration.py tests/test_integration_real.py -v
+# Run default development suite (fast, works everywhere)
+python3 run_tests.py
 
-# Unit tests (mocked dependencies)  
+# Run specific test categories
+python3 run_tests.py --unit                    # Fast unit tests only
+python3 run_tests.py --integration-graceful    # Integration tests (mocked external services)
+python3 run_tests.py --integration-real        # Integration tests (real external services)
+python3 run_tests.py --utils                   # Utility tests only
+python3 run_tests.py --performance             # Performance tests only
+```
+
+### Test Categories Explained
+
+**🚀 Unit Tests** - Fast, all dependencies mocked
+- `tests/test_main.py` - Core API endpoints and authentication
+- `tests/test_unit_mocked.py` - New SMS endpoints with heavy mocking
+- Both complement each other, run together for full unit coverage
+
+**🔗 Integration Tests** - **Choose one approach:**
+- `tests/test_integration.py` - **Graceful/Mocked** (mocks database, AI, SMS calls)
+- `tests/test_integration_real.py` - **Real Services** (actually hits database, AI, SMS)
+- **For Development/CI**: Use `--integration-graceful` (fast, no API keys needed)
+- **For Production Testing**: Use `--integration-real` (requires Firebase, OpenAI, Twilio)
+
+**🛠️ Utility Tests** - Core functionality and validation
+- `tests/test_utils.py` - Database, models, and utility functions
+
+**⚡ Performance Tests** - Speed and load testing
+- `tests/test_performance.py` - API response times and concurrent load
+
+### Common Development Workflows
+
+```bash
+# 🏃 Default development suite (fast, works everywhere, ~25 seconds)
+python3 run_tests.py
+
+# ⚡ Quick unit tests only (super fast, ~1 second)
+python3 run_tests.py --unit
+
+# 🔍 Test with real services (production readiness, ~45 seconds)
+python3 run_tests.py --unit --integration-real --utils
+
+# 📈 Full production check with performance (requires API keys, ~1 minute)
+python3 run_tests.py --unit --integration-real --utils --performance
+
+# 🎯 Just test your new feature integration
+python3 run_tests.py --integration-graceful
+```
+
+### Manual Test Commands
+
+If you prefer running tests manually:
+
+```bash
+# Fast unit tests (recommended for development)
 python3 -m pytest tests/test_main.py tests/test_unit_mocked.py -v
+
+# Integration tests - graceful/mocked (works without external services)
+python3 -m pytest tests/test_integration.py -v
+
+# Integration tests - real services (requires API keys)
+python3 -m pytest tests/test_integration_real.py -v
 
 # Utility and validation tests
 python3 -m pytest tests/test_utils.py -v
@@ -111,6 +170,10 @@ All endpoints require API key authentication via `X-API-Key` header.
 - `POST /messages/send` - Generate AI message and send SMS
 - `POST /messages/manual` - Create manual message record
 - `POST /messages/incoming` - Twilio webhook (no auth required)
+- `POST /messages/initial/sms` - Send initial SMS with AI generation
+- `POST /messages/initial/demo` - Generate initial demo message (no SMS)
+- `POST /messages/ongoing/sms` - Send ongoing SMS response
+- `POST /messages/ongoing/demo` - Generate ongoing demo response (no SMS)
 
 ## Project Structure
 

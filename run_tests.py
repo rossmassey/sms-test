@@ -1,131 +1,171 @@
 #!/usr/bin/env python3
 """
 Test runner script for the SMS Outreach Backend.
-Provides different test execution options.
+Runs test suites based on category flags or all tests by default.
 """
 
 import subprocess
 import sys
+import time
 import argparse
+from typing import List, Tuple
 
-def run_tests(test_type="all", verbose=True, coverage=False):
-    """Run tests based on the specified type."""
-    
-    base_cmd = ["python", "-m", "pytest"]
-    
-    if verbose:
-        base_cmd.append("-v")
-    
-    if coverage:
-        base_cmd.extend(["--cov=app", "--cov-report=html", "--cov-report=term"])
-    
-    # Test type configurations
-    test_configs = {
-        "unit": {
-            "paths": ["tests/test_main.py", "tests/test_unit_mocked.py", "tests/test_utils.py"],
-            "markers": []
-        },
-        "integration": {
-            "paths": ["tests/test_integration_real.py"],
-            "markers": []
-        },
-        "performance": {
-            "paths": ["tests/test_performance.py"],
-            "markers": []
-        },
-        "all": {
-            "paths": ["tests/test_main.py", "tests/test_unit_mocked.py", "tests/test_utils.py", "tests/test_integration_real.py"],
-            "markers": []
-        },
-        "quick": {
-            "paths": ["tests/test_main.py", "tests/test_unit_mocked.py", "tests/test_utils.py"],
-            "markers": []
-        },
-        "api": {
-            "paths": ["tests/test_main.py"],
-            "markers": ["-k", "test_customer or test_message or test_health"]
-        }
-    }
-    
-    if test_type not in test_configs:
-        print(f"Unknown test type: {test_type}")
-        print(f"Available types: {', '.join(test_configs.keys())}")
-        return False
-    
-    config = test_configs[test_type]
-    cmd = base_cmd + config["paths"] + config["markers"]
-    
-    print(f"Running {test_type} tests...")
+
+def run_command(cmd: List[str], suite_name: str) -> Tuple[bool, float]:
+    """Run a command and return success status and execution time."""
+    print(f"\n{'='*60}")
+    print(f"🧪 Running {suite_name}")
+    print(f"{'='*60}")
     print(f"Command: {' '.join(cmd)}")
-    print("-" * 60)
+    print()
     
+    start_time = time.time()
     try:
         result = subprocess.run(cmd, check=False)
-        return result.returncode == 0
+        execution_time = time.time() - start_time
+        
+        if result.returncode == 0:
+            print(f"\n✅ {suite_name} PASSED ({execution_time:.2f}s)")
+            return True, execution_time
+        else:
+            print(f"\n❌ {suite_name} FAILED ({execution_time:.2f}s)")
+            return False, execution_time
+            
     except KeyboardInterrupt:
-        print("\nTests interrupted by user")
-        return False
+        print(f"\n⚠️  {suite_name} interrupted by user")
+        return False, time.time() - start_time
     except Exception as e:
-        print(f"Error running tests: {e}")
-        return False
+        print(f"\n💥 {suite_name} crashed: {e}")
+        return False, time.time() - start_time
+
+
+def get_test_suites():
+    """Define all available test suites."""
+    return {
+        "unit": [
+            {
+                "name": "Unit Tests (Core API & Auth)",
+                "cmd": ["python3", "-m", "pytest", "tests/test_main.py", "-v"]
+            },
+            {
+                "name": "Unit Tests (New SMS Endpoints)",
+                "cmd": ["python3", "-m", "pytest", "tests/test_unit_mocked.py", "-v"]
+            }
+        ],
+        "integration": [
+            {
+                "name": "Integration Tests (Graceful)",
+                "cmd": ["python3", "-m", "pytest", "tests/test_integration.py", "-v"]
+            },
+            {
+                "name": "Integration Tests (Real Services)",
+                "cmd": ["python3", "-m", "pytest", "tests/test_integration_real.py", "-v"]
+            }
+        ],
+        "utils": [
+            {
+                "name": "Utility and Validation Tests",
+                "cmd": ["python3", "-m", "pytest", "tests/test_utils.py", "-v"]
+            }
+        ],
+        "performance": [
+            {
+                "name": "Performance Tests",
+                "cmd": ["python3", "-m", "pytest", "tests/test_performance.py", "-v"]
+            }
+        ]
+    }
 
 def main():
-    """Main function with argument parsing."""
+    """Run test suites based on arguments."""
     parser = argparse.ArgumentParser(description="SMS Outreach Backend Test Runner")
-    
-    parser.add_argument(
-        "test_type",
-        nargs="?",
-        default="quick",
-        choices=["unit", "integration", "performance", "all", "quick", "api"],
-        help="Type of tests to run (default: quick)"
-    )
-    
-    parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        default=True,
-        help="Verbose output (default: True)"
-    )
-    
-    parser.add_argument(
-        "-q", "--quiet",
-        action="store_true",
-        help="Quiet output (overrides verbose)"
-    )
-    
-    parser.add_argument(
-        "--coverage",
-        action="store_true",
-        help="Run with coverage reporting"
-    )
-    
-    parser.add_argument(
-        "--install-deps",
-        action="store_true",
-        help="Install test dependencies before running"
-    )
+    parser.add_argument("--unit", action="store_true", help="Run unit tests only (fast, mocked)")
+    parser.add_argument("--integration-graceful", action="store_true", help="Run graceful integration tests (works without external services)")
+    parser.add_argument("--integration-real", action="store_true", help="Run real integration tests (requires API keys)")
+    parser.add_argument("--utils", action="store_true", help="Run utility tests only")
+    parser.add_argument("--performance", action="store_true", help="Run performance tests only")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed test output")
     
     args = parser.parse_args()
     
-    if args.install_deps:
-        print("Installing test dependencies...")
-        subprocess.run([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"], check=True)
+    # Determine which test suites to run
+    all_suites = get_test_suites()
+    selected_suites = []
     
-    verbose = args.verbose and not args.quiet
+    if args.unit:
+        selected_suites.extend(all_suites["unit"])
+    if args.integration_graceful:
+        selected_suites.append(all_suites["integration"][0])  # Graceful only
+    if args.integration_real:
+        selected_suites.append(all_suites["integration"][1])  # Real only
+    if args.utils:
+        selected_suites.extend(all_suites["utils"])
+    if args.performance:
+        selected_suites.extend(all_suites["performance"])
     
-    success = run_tests(
-        test_type=args.test_type,
-        verbose=verbose,
-        coverage=args.coverage
-    )
+    # If no specific flags, run a sensible default for development
+    if not any([args.unit, args.integration_graceful, args.integration_real, args.utils, args.performance]):
+        print("🚀 SMS Outreach Backend Test Runner")
+        print("Running default development suite: Unit + Graceful Integration + Utils")
+        print("(Use --help for specific categories)")
+        selected_suites.extend(all_suites["unit"])
+        selected_suites.append(all_suites["integration"][0])  # Graceful only
+        selected_suites.extend(all_suites["utils"])
+    else:
+        print("🚀 SMS Outreach Backend Test Runner")
+        categories = []
+        if args.unit: categories.append("Unit")
+        if args.integration_graceful: categories.append("Integration (Graceful)")
+        if args.integration_real: categories.append("Integration (Real)")
+        if args.utils: categories.append("Utils")
+        if args.performance: categories.append("Performance")
+        print(f"Running {', '.join(categories)} tests only")
     
-    if success:
-        print("\n✅ All tests passed!")
+    results = []
+    total_start_time = time.time()
+    
+    # Run each test suite separately
+    for suite in selected_suites:
+        success, execution_time = run_command(suite["cmd"], suite["name"])
+        results.append({
+            "name": suite["name"],
+            "success": success,
+            "time": execution_time
+        })
+    
+    total_time = time.time() - total_start_time
+    
+    # Print summary
+    print(f"\n{'='*60}")
+    print("📊 TEST RESULTS SUMMARY")
+    print(f"{'='*60}")
+    
+    passed = 0
+    failed = 0
+    
+    for result in results:
+        status = "✅ PASSED" if result["success"] else "❌ FAILED"
+        print(f"{status:<10} {result['name']:<35} ({result['time']:.2f}s)")
+        if result["success"]:
+            passed += 1
+        else:
+            failed += 1
+    
+    print(f"\n{'='*60}")
+    print(f"🎯 FINAL RESULTS:")
+    print(f"   Total Suites: {len(results)}")
+    print(f"   Passed: {passed}")
+    print(f"   Failed: {failed}")
+    print(f"   Total Time: {total_time:.2f}s")
+    print(f"{'='*60}")
+    
+    if failed == 0:
+        print("🎉 ALL TEST SUITES PASSED! 🎉")
         return 0
     else:
-        print("\n❌ Some tests failed!")
+        print(f"💥 {failed} TEST SUITE(S) FAILED!")
         return 1
 
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main()) 

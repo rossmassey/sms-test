@@ -9,12 +9,12 @@ from unittest.mock import Mock, patch, AsyncMock
 from fastapi.testclient import TestClient
 from datetime import datetime
 
-# Import the test app instead of the real app
-from tests.test_app import test_app
+# Import the mock app instead of the real app
+from tests.test_app import mock_app
 from app.models import CustomerCreate, CustomerUpdate, MessageSend, Customer, Message
 
-# Create test client with test app
-client = TestClient(test_app)
+# Create test client with mock app
+client = TestClient(mock_app)
 
 # Test data
 VALID_API_KEY = "sms_backend_2025_secure_key_xyz789"
@@ -207,7 +207,7 @@ class TestMessageEndpoints:
     def test_list_messages_empty(self, auth_headers):
         """Test listing messages when collection is empty."""
         from tests.test_app import mock_messages_collection
-        mock_messages_collection.order_by.return_value.limit.return_value.offset.return_value.stream.return_value = []
+        mock_messages_collection.stream.return_value = []
         
         response = client.get("/messages", headers=auth_headers)
         assert response.status_code == 200
@@ -430,7 +430,7 @@ class TestErrorHandling:
         response = client.post(
             "/customers", 
             headers=auth_headers, 
-            data="invalid json"
+            content="invalid json"
         )
         assert response.status_code == 422
     
