@@ -109,17 +109,34 @@ The AI can generate 7 types of personalized messages:
 ## 🚨 Auto-Escalation System
 
 AI automatically stops responding and alerts staff when it detects:
-- Angry or frustrated customers
-- Medical concerns or side effects
-- Billing disputes or refund requests
-- Complex scheduling issues
-- "Do not contact" requests (complete silence)
+- **Violence/Threats** - Any threatening language toward staff or property
+- **Legal Issues** - Mentions of suing, lawyers, malpractice, or legal action
+- **Medical Emergencies** - Severe pain, bleeding, allergic reactions, or complications
+- **Extreme Anger** - Unacceptable service complaints or insulting language
+- **Do Not Contact** - Complete silence for unsubscribe requests
+
+**Escalation Features:**
+- **Deterministic Pattern Detection** - Critical threats bypass AI for safety
+- **Contextual Acknowledgments** - Professional responses before escalation
+- **Complete Silence** - No response to "do not contact" requests
+- **Comprehensive Testing** - 28 test cases covering all escalation scenarios
 
 ## 📊 Testing
 
 ```bash
 python3 run_tests.py
 ```
+
+**Test Categories:**
+- `--unit` - Core API, SMS endpoints, and escalation detection (recommended for development)
+- `--integration` - Full stack tests with Firebase, OpenAI, and Twilio
+- `--utils` - Utility function validation tests
+- `--performance` - Load and performance benchmarks
+
+**Key Test Suites:**
+- **Escalation Detection** - 28 test cases covering violence, legal threats, medical emergencies, and do-not-contact scenarios
+- **SMS Endpoints** - All 4 new message endpoints with mocked services
+- **Core API** - Authentication, customer management, and database operations
 
 Use `-h` for additional test options and categories.
 

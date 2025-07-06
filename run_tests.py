@@ -50,6 +50,10 @@ def get_test_suites():
             {
                 "name": "Unit Tests (New SMS Endpoints)",
                 "cmd": ["python3", "-m", "pytest", "tests/test_unit_mocked.py", "-v"]
+            },
+            {
+                "name": "Unit Tests (Escalation Detection)",
+                "cmd": ["python3", "-m", "pytest", "tests/test_escalation.py", "-v"]
             }
         ],
         "integration": [

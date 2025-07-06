@@ -83,14 +83,21 @@ Generate only the SMS message content, no additional text or explanations.
 """
 
 DEFAULT_AUTO_REPLY_TEMPLATE = """
-You are an AI assistant for NextGen MedSpa, a medical spa offering advanced laser, skin, and body treatments in Hatfield, MA. You communicate via SMS text messages, so keep responses concise and friendly.
+You are an AI assistant for NextGen MedSpa, a medical spa offering advanced laser, skin, and body treatments in Hatfield, MA. You communicate via SMS text messages professionally and naturally.
 
 Your role is to:
 1. Answer questions about services, pricing, and availability
 2. Help with appointment scheduling requests (but explain they'll need to call to confirm)
 3. Provide information about treatments and policies
 4. Handle promotional inquiries and appointment reminders
-5. Always maintain a warm, professional, and helpful tone
+5. Communicate like a helpful, professional staff member - not a marketing bot
+
+COMMUNICATION STYLE:
+- Sound natural and conversational, like a real person
+- Be helpful and professional, not overly promotional
+- Avoid excessive emojis, exclamation points, or marketing language
+- Don't sound like spam or automated marketing messages
+- Keep responses concise but warm and personable
 
 {business_data}
 
@@ -105,20 +112,46 @@ Customer Information:
 Recent Message History:
 {message_history}
 
+CRITICAL CONVERSATION RULES:
+1. REVIEW YOUR PREVIOUS RESPONSES: Look at the message history above. If you've already given similar responses, VARY your wording significantly.
+2. ANSWER QUESTIONS DIRECTLY: If the customer asks about a specific service (like "do you have a pool?"), give a clear direct answer first, then additional info.
+3. AVOID REPETITION: Never send the exact same or nearly identical response multiple times. Each response should feel fresh and natural.
+4. BE CONVERSATIONAL: Respond like a human staff member who remembers what they just said and adjusts accordingly.
+
 IMPORTANT: Use the conversation history to provide personalized responses. If the customer mentioned specific services or had previous treatments, reference that context naturally.
 
-ESCALATE TO HUMAN if ANY of these apply:
-- Customer shows ANY emotion (upset, frustrated, angry, disappointed)
-- ANY complaint or concern about service/products
-- ANY mention of legal issues, lawyers, lawsuits
-- ANY medical questions or health concerns (don't provide medical advice)
-- ANY billing, payment, or refund questions
-- ANY complex questions requiring expertise
-- Customer seems confused or unclear
-- ANY negative words or tone
-- Specific appointment scheduling (direct them to call)
-- Side effects or treatment complications
+CRITICAL: ESCALATE IMMEDIATELY if customer message contains ANY of these:
+
+VIOLENCE/THREATS:
+- ANY threats of violence ("kill", "hurt", "destroy", "burn", "shoot")
+- ANY threatening language toward staff or property
+- ANY mention of physical harm or retaliation
+
+LEGAL ISSUES:
+- ANY mention of suing, lawyers, attorneys, lawsuits
+- ANY mention of legal action, malpractice, reporting
+- ANY mention of state boards, licensing complaints
+
+MEDICAL EMERGENCIES:
+- ANY mention of severe pain, bleeding, allergic reactions
+- ANY concerning physical symptoms or side effects
+- ANY mention of complications, infections, or adverse reactions
+- ANYTHING that could be a medical emergency
+
+EXTREME ANGER/COMPLAINTS:
+- Words like "unacceptable", "furious", "terrible", "worst"
+- ANY demands for refunds or money back
+- ANY insulting language toward staff or business
+- ANY negative reviews or threats to damage reputation
+- ANY complaints or worries about the staff or business
+
+ALSO ESCALATE FOR:
+- Complex appointment scheduling (direct them to call)
+- Billing, payment, or refund questions
+- Any confusion or unclear requests
 - Anything requiring professional judgment
+
+WHEN IN DOUBT: ESCALATE. Better safe than sorry for a medical spa business.
 
 AUTO-REPLY for questions you can answer with business info:
 - Basic hours questions ("what time do you close?")
@@ -126,9 +159,11 @@ AUTO-REPLY for questions you can answer with business info:
 - Contact information questions
 - Simple greeting messages
 - Simple "thank you" messages
-- General service information and pricing estimates
-- Treatment descriptions and durations
+- Services ONLY if explicitly listed in business data above (DO NOT assume or invent services)
+- Treatment descriptions and durations for listed services only
 - Policies and cancellation info
+
+CRITICAL SERVICE RULE: Only mention services explicitly listed in the business data above. If asked about services not on the list (spa, sauna, pool, massage, etc.), respond: "I don't see that service on our current menu. Please call (413) 555-0123 for the most up-to-date information."
 
 CRITICAL: DO NOT CONTACT requests - if customer says ANY of these words/phrases, set DO_NOT_CONTACT=true:
 - Contains "do not contact", "don't contact", "stop messaging", "stop texting", "don't text"
@@ -159,13 +194,14 @@ REASON: [brief explanation]
 # Message type templates for different types of initial messages
 MESSAGE_TYPE_TEMPLATES = {
     "welcome": """
-Generate a warm welcome message for new customer {customer_name} from NextGen MedSpa.
+Generate a warm, professional welcome message for new customer {customer_name} from NextGen MedSpa.
 This is their first interaction with our medical spa in Hatfield, MA.
 Context: {context}
 
-Make the message friendly, welcoming, and informative. Mention 1-2 of our popular services like laser treatments, facials, or body contouring. 
-Keep it under 160 characters but make it feel personal and inviting.
-Examples: "Hi Sarah! Welcome to NextGen MedSpa! 🌟 We're excited to help you with advanced laser & skin treatments. Questions? Text back or call (413) 555-0123!"
+Make the message friendly and professional, not overly promotional. Sound like a real person from the spa.
+Avoid excessive emojis, exclamation points, or sales language.
+Keep it under 160 characters and conversational.
+Examples: "Hi Sarah, welcome to NextGen MedSpa! We're here to help with all your skincare needs. Any questions? Feel free to text back or call us at (413) 555-0123."
 """,
     "follow-up": """
 Generate a caring follow-up message for customer {customer_name} from NextGen MedSpa.
@@ -186,13 +222,13 @@ Keep it under 160 characters but informative.
 Examples: "Hi Lisa! Reminder: Your HydraFacial is tomorrow at 2pm. Please arrive 15 mins early! Questions? Call (413) 555-0123 📅"
 """,
     "promotional": """
-Generate an exciting promotional message for customer {customer_name} from NextGen MedSpa.
+Generate a professional promotional message for customer {customer_name} from NextGen MedSpa.
 This is to inform them about a special offer, discount, or new service.
 Context: {context}
 
-Make the message exciting, valuable, and personalized. If they've had previous treatments, reference those naturally.
-Include a clear call-to-action. Keep it under 160 characters but enticing.
-Examples: "Hi Emma! Special offer: 20% off your next laser treatment! Perfect time to continue your skincare journey. Call (413) 555-0123 to book! ✨"
+Make the message professional and informative, not pushy or overly salesy. Reference previous treatments if relevant.
+Sound like helpful information, not spam. Keep it under 160 characters and conversational.
+Examples: "Hi Emma, we have a special offer on laser treatments this month. Would be perfect as a follow-up to your recent visit. Call (413) 555-0123 if you're interested."
 """,
     "support": """
 Generate a supportive message for customer {customer_name} from NextGen MedSpa.
@@ -258,7 +294,7 @@ async def generate_outbound_message(
         )
 
         response = await openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system",
                  "content": "You are an AI assistant for NextGen MedSpa, a medical spa in Hatfield, MA. Generate warm, professional SMS messages for customers. Keep responses concise and friendly."},
@@ -276,7 +312,7 @@ async def generate_outbound_message(
             prompt += "\n\nIMPORTANT: The message MUST be under 160 characters."
 
             response = await openai_client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system",
                      "content": "You are an AI assistant for NextGen MedSpa, a medical spa in Hatfield, MA. Generate concise, friendly SMS messages under 160 characters."},
@@ -324,7 +360,7 @@ async def generate_initial_message(
         )
 
         response = await openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system",
                  "content": f"You are an AI assistant for NextGen MedSpa, a medical spa in Hatfield, MA. Generate friendly, professional {message_type} SMS messages for customers."},
@@ -341,7 +377,7 @@ async def generate_initial_message(
             prompt += "\n\nIMPORTANT: The message MUST be under 160 characters."
 
             response = await openai_client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system",
                      "content": f"You are an AI assistant for NextGen MedSpa, a medical spa in Hatfield, MA. Generate concise, friendly {message_type} SMS messages under 160 characters."},
@@ -370,7 +406,7 @@ def _check_do_not_contact_patterns(message: str) -> bool:
         bool: True if message contains do-not-contact patterns
     """
     message_lower = message.lower().strip()
-
+    
     # Exact phrase patterns
     do_not_contact_patterns = [
         "do not contact",
@@ -389,16 +425,15 @@ def _check_do_not_contact_patterns(message: str) -> bool:
         "don't want to hear",
         "no more messages",
         "not interested",
-        "if you contact me again",
-        "will sue",
-        "legal action"
+        "if you contact me again i will sue",
+        "if you contact me again, i will sue"
     ]
-
+    
     # Check for exact patterns
     for pattern in do_not_contact_patterns:
         if pattern in message_lower:
             return True
-
+    
     # Check for common variations
     if any(phrase in message_lower for phrase in [
         "stop", "don't", "remove", "unsubscribe", "opt out"
@@ -406,7 +441,75 @@ def _check_do_not_contact_patterns(message: str) -> bool:
         "contact", "message", "text", "call", "bother"
     ]):
         return True
+    
+    return False
 
+
+def _check_critical_escalation_patterns(message: str) -> bool:
+    """
+    Check for critical threats that must ALWAYS escalate using deterministic pattern matching.
+    
+    Args:
+        message: The incoming message to check
+    
+    Returns:
+        bool: True if message contains critical escalation patterns
+    """
+    message_lower = message.lower().strip()
+    
+    # Violence/threat patterns
+    violence_patterns = [
+        "kill", "hurt", "harm", "destroy", "burn", "shoot", "attack", "beat",
+        "murder", "violence", "weapon", "gun", "knife", "bomb", "explode", "pay",
+        "know where you live", "find you", "get you", "come for you"
+    ]
+    
+    # Legal threat patterns  
+    legal_patterns = [
+        "sue", "lawyer", "attorney", "lawsuit", "legal action", "malpractice",
+        "court", "judge", "litigation", "state board", "licensing", "report you",
+        "legal", "action"
+    ]
+    
+    # Medical emergency patterns
+    medical_emergency_patterns = [
+        "severe pain", "bleeding", "allergic reaction", "can't breathe", 
+        "emergency", "hospital", "infection", "swollen", "rash", "burning",
+        "doesn't look right", "looks wrong", "something wrong", "something is wrong", "not right"
+    ]
+    
+    # Extreme anger patterns
+    extreme_anger_patterns = [
+        "unacceptable", "furious", "terrible", "worst", "horrible", "disgusting",
+        "incompetent", "idiots", "stupid", "hate you", "money back", "never coming back",
+        "never again", "done with you", "awful", "pathetic"
+    ]
+    
+    # Check violence patterns
+    for pattern in violence_patterns:
+        if pattern in message_lower:
+            return True
+    
+    # Check legal patterns
+    for pattern in legal_patterns:
+        if pattern in message_lower:
+            return True
+            
+    # Check medical emergency patterns
+    for pattern in medical_emergency_patterns:
+        if pattern in message_lower:
+            return True
+            
+    # Check extreme anger patterns
+    for pattern in extreme_anger_patterns:
+        if pattern in message_lower:
+            return True
+    
+    # Specific threat combinations
+    if any(threat in message_lower for threat in ["going to", "will", "gonna"]) and \
+       any(action in message_lower for action in ["kill", "hurt", "destroy", "sue", "report"]):
+        return True
+    
     return False
 
 
@@ -433,6 +536,16 @@ async def generate_auto_reply(
         # First check for do-not-contact patterns deterministically
         if _check_do_not_contact_patterns(incoming_message):
             return None, True, True
+        
+        # Check for critical escalation patterns that must always escalate
+        if _check_critical_escalation_patterns(incoming_message):
+            print(f"[DEBUG] Critical escalation pattern detected: {incoming_message}")
+            # Generate an escalation acknowledgment message
+            escalation_message = await generate_escalation_message(
+                incoming_message, customer_data.get('name', 'Customer')
+            )
+            return escalation_message, True, False  # Send acknowledgment, escalate, not do_not_contact
+        
         # Format message history for context
         history_text = ""
         for msg in message_history[-5:]:  # Last 5 messages for context
@@ -454,14 +567,14 @@ async def generate_auto_reply(
         )
 
         response = await openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system",
                  "content": "You are an AI assistant for NextGen MedSpa in Hatfield, MA. Process incoming SMS messages and decide whether to auto-reply or escalate to humans. Keep responses warm and professional."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=200,
-            temperature=0.3  # Lower temperature for more consistent responses
+            temperature=0.7  # Higher temperature for more varied, natural responses
         )
 
         response_text = response.choices[0].message.content.strip()
@@ -529,7 +642,7 @@ Generate only the message, no extra text.
 """
 
         response = await openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system",
                  "content": "You are an AI assistant for NextGen MedSpa in Hatfield, MA. Generate empathetic escalation messages for customers who need human assistance."},
@@ -607,7 +720,7 @@ Generate only the response message, no additional text.
 """
 
         response = await openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system",
                  "content": "You are an AI assistant for NextGen MedSpa in Hatfield, MA. Generate warm, professional responses to customer messages using conversation context."},
@@ -624,7 +737,7 @@ Generate only the response message, no additional text.
             prompt += "\n\nIMPORTANT: The response MUST be under 160 characters."
 
             response = await openai_client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system",
                      "content": "You are an AI assistant for NextGen MedSpa in Hatfield, MA. Generate concise, friendly responses under 160 characters."},
@@ -701,7 +814,7 @@ Generate only the response message, no additional text.
 """
 
         response = await openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system",
                  "content": "You are an AI assistant for NextGen MedSpa in Hatfield, MA. Generate warm, professional responses to customer messages using conversation context."},
@@ -718,7 +831,7 @@ Generate only the response message, no additional text.
             prompt += "\n\nIMPORTANT: The response MUST be under 160 characters."
 
             response = await openai_client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system",
                      "content": "You are an AI assistant for NextGen MedSpa in Hatfield, MA. Generate concise, friendly responses under 160 characters."},
@@ -765,7 +878,7 @@ REASON: [brief explanation of the analysis]
 """
 
         response = await openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system",
                  "content": "You are an AI assistant for NextGen MedSpa that analyzes customer messages for sentiment, urgency, and escalation needs."},

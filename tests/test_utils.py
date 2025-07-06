@@ -88,13 +88,10 @@ REASON: Simple hours inquiry, can be handled automatically"""
         """Test auto-reply generation that needs escalation."""
         from app.utils.llm_client import generate_auto_reply
         
+        # Mock the escalation message generation
         mock_response = Mock()
         mock_response.choices = [Mock()]
-        mock_response.choices[0].message.content = """
-        AUTO_REPLY: NONE
-        ESCALATE: true
-        REASON: Customer complaint requires human attention
-        """
+        mock_response.choices[0].message.content = "Hi Angry Customer, I'm sorry to hear about your experience. A staff member will contact you shortly to resolve this."
         mock_openai.chat.completions.create = AsyncMock(return_value=mock_response)
         
         customer_data = {"name": "Angry Customer", "phone": "+1111111111"}
@@ -102,7 +99,10 @@ REASON: Simple hours inquiry, can be handled automatically"""
         
         reply, escalate, is_do_not_contact = await generate_auto_reply(incoming_message, customer_data, [])
         
-        assert reply is None
+        # With deterministic pattern detection, "unacceptable" triggers immediate escalation
+        # and generates an acknowledgment message
+        assert reply is not None
+        assert "staff member" in reply or "team member" in reply  # Should contain escalation acknowledgment
         assert escalate is True
         assert is_do_not_contact is False
     
