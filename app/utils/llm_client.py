@@ -18,6 +18,18 @@ if not api_key:
 
 openai_client = AsyncOpenAI(api_key=api_key)
 
+# System message templates for consistency
+SYSTEM_MESSAGE_BASE = "You are an AI assistant for NextGen MedSpa, a medical spa in Hatfield, MA."
+SYSTEM_MESSAGE_GENERATE = f"{SYSTEM_MESSAGE_BASE} Generate warm, professional SMS messages for customers. Keep responses concise and friendly."
+SYSTEM_MESSAGE_GENERATE_TYPED = f"{SYSTEM_MESSAGE_BASE} Generate friendly, professional {{message_type}} SMS messages for customers."
+SYSTEM_MESSAGE_CONVERSATION = f"{SYSTEM_MESSAGE_BASE} Generate warm, professional responses to customer messages using conversation context."
+SYSTEM_MESSAGE_AUTO_REPLY = f"{SYSTEM_MESSAGE_BASE} Process incoming SMS messages and decide whether to auto-reply or escalate to humans. Keep responses warm and professional."
+SYSTEM_MESSAGE_ESCALATION = f"{SYSTEM_MESSAGE_BASE} Generate empathetic escalation messages for customers who need human assistance."
+SYSTEM_MESSAGE_ANALYSIS = f"{SYSTEM_MESSAGE_BASE} Analyze customer messages for sentiment, urgency, and escalation needs."
+
+# Length constraint for concise messages
+LENGTH_CONSTRAINT = " Keep messages under 160 characters."
+
 # Default business data - can be configured by staff
 DEFAULT_BUSINESS_DATA = """
 Business Information:
@@ -297,7 +309,7 @@ async def generate_outbound_message(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system",
-                 "content": "You are an AI assistant for NextGen MedSpa, a medical spa in Hatfield, MA. Generate warm, professional SMS messages for customers. Keep responses concise and friendly."},
+                 "content": SYSTEM_MESSAGE_GENERATE},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=150,
@@ -315,7 +327,7 @@ async def generate_outbound_message(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system",
-                     "content": "You are an AI assistant for NextGen MedSpa, a medical spa in Hatfield, MA. Generate concise, friendly SMS messages under 160 characters."},
+                     "content": SYSTEM_MESSAGE_GENERATE + LENGTH_CONSTRAINT},
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=100,
@@ -363,7 +375,7 @@ async def generate_initial_message(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system",
-                 "content": f"You are an AI assistant for NextGen MedSpa, a medical spa in Hatfield, MA. Generate friendly, professional {message_type} SMS messages for customers."},
+                 "content": SYSTEM_MESSAGE_GENERATE_TYPED.format(message_type=message_type)},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=150,
@@ -380,7 +392,7 @@ async def generate_initial_message(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system",
-                     "content": f"You are an AI assistant for NextGen MedSpa, a medical spa in Hatfield, MA. Generate concise, friendly {message_type} SMS messages under 160 characters."},
+                     "content": SYSTEM_MESSAGE_GENERATE_TYPED.format(message_type=message_type) + LENGTH_CONSTRAINT},
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=100,
@@ -570,7 +582,7 @@ async def generate_auto_reply(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system",
-                 "content": "You are an AI assistant for NextGen MedSpa in Hatfield, MA. Process incoming SMS messages and decide whether to auto-reply or escalate to humans. Keep responses warm and professional."},
+                 "content": SYSTEM_MESSAGE_AUTO_REPLY},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=200,
@@ -645,7 +657,7 @@ Generate only the message, no extra text.
             model="gpt-4o-mini",
             messages=[
                 {"role": "system",
-                 "content": "You are an AI assistant for NextGen MedSpa in Hatfield, MA. Generate empathetic escalation messages for customers who need human assistance."},
+                 "content": SYSTEM_MESSAGE_ESCALATION},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=100,
@@ -691,7 +703,7 @@ async def generate_ongoing_response(
             history_text = "No previous conversation history"
 
         prompt = f"""
-You are an AI assistant for NextGen MedSpa, a medical spa in Hatfield, MA. Generate a warm, professional response to the customer's message.
+{SYSTEM_MESSAGE_BASE} Generate a warm, professional response to the customer's message.
 
 {get_business_data()}
 
@@ -723,7 +735,7 @@ Generate only the response message, no additional text.
             model="gpt-4o-mini",
             messages=[
                 {"role": "system",
-                 "content": "You are an AI assistant for NextGen MedSpa in Hatfield, MA. Generate warm, professional responses to customer messages using conversation context."},
+                 "content": SYSTEM_MESSAGE_CONVERSATION},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=150,
@@ -740,7 +752,7 @@ Generate only the response message, no additional text.
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system",
-                     "content": "You are an AI assistant for NextGen MedSpa in Hatfield, MA. Generate concise, friendly responses under 160 characters."},
+                     "content": SYSTEM_MESSAGE_CONVERSATION + LENGTH_CONSTRAINT},
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=100,
@@ -788,7 +800,7 @@ async def generate_demo_response(
             history_text = "No previous conversation history"
 
         prompt = f"""
-You are an AI assistant for NextGen MedSpa, a medical spa in Hatfield, MA. Generate a warm, professional response to the customer's message.
+{SYSTEM_MESSAGE_BASE} Generate a warm, professional response to the customer's message.
 
 {get_business_data()}
 
@@ -817,7 +829,7 @@ Generate only the response message, no additional text.
             model="gpt-4o-mini",
             messages=[
                 {"role": "system",
-                 "content": "You are an AI assistant for NextGen MedSpa in Hatfield, MA. Generate warm, professional responses to customer messages using conversation context."},
+                 "content": SYSTEM_MESSAGE_CONVERSATION},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=150,
@@ -834,7 +846,7 @@ Generate only the response message, no additional text.
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system",
-                     "content": "You are an AI assistant for NextGen MedSpa in Hatfield, MA. Generate concise, friendly responses under 160 characters."},
+                     "content": SYSTEM_MESSAGE_CONVERSATION + LENGTH_CONSTRAINT},
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=100,
@@ -881,7 +893,7 @@ REASON: [brief explanation of the analysis]
             model="gpt-4o-mini",
             messages=[
                 {"role": "system",
-                 "content": "You are an AI assistant for NextGen MedSpa that analyzes customer messages for sentiment, urgency, and escalation needs."},
+                 "content": SYSTEM_MESSAGE_ANALYSIS},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=150,
