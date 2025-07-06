@@ -17,32 +17,41 @@ This backend service enables staff to initiate SMS conversations with customers,
 
 ## Quick Start
 
-### Configuration
+### 1. Configuration
 
-Create a `.env` file from the template and fill in with required service credentials
+1. Add `firebase-service-account.json` to the root of the repo
+
+2. Create a `.env` file from the template and fill in with required service credentials
+
+    ```bash
+    cp .env.template .env
+    ```
+
+### 2. Installation
 
 ```bash
-cp .env.tmplate .env
-```
-
-### Installation
-
-```bash
+# Set up venv
 python3 -m venv venv
+# Activate venv
 source venv/bin/activate
+# Install requirements in venv
 pip install -r requirements.txt
+
+# Install npm dependencies for demo
 cd jank_ui && npm install
 ```
+
+### 3. Run demo app
 
 Back in the root of the repo:
 
 ```bash
-python3 run_demo.py
+python run_demo.py
 ```
 
 This provides a complete workflow demonstration including customer management, conversation initiation, and staff intervention capabilities.
 
-### Running the Service
+## Running the API Service
 
 ```bash
 python run_dev.py
@@ -50,7 +59,7 @@ python run_dev.py
 
 The API will be available at `http://localhost:8000` with interactive documentation at `/docs`.
 
-## API Endpoints
+### API Endpoints
 
 All endpoints require API key authentication via `X-API-Key` header.
 
@@ -111,12 +120,7 @@ Run the test suite with:
 ```bash
 python3 run_tests.py
 ```
-
-Test categories:
-- `--unit` - Core API and functionality tests
-- `--integration` - Full stack tests with external services
-- `--utils` - Utility function validation
-- `--performance` - Load and performance testing
+Add `--help` for more info
 
 ## Project Structure
 
