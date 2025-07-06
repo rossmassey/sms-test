@@ -108,6 +108,8 @@ function App() {
 function CustomerList({customers, onSelect, onRefresh}) {
     const [customerStatuses, setCustomerStatuses] = useState({});
     const [loadingStatuses, setLoadingStatuses] = useState(false);
+    const [deleting, setDeleting] = useState(null);
+    const [statusMessage, setStatusMessage] = useState('');
 
     // Load status for all customers
     useEffect(() => {
@@ -163,6 +165,35 @@ function CustomerList({customers, onSelect, onRefresh}) {
         return {status: 'AI Active', color: '#388e3c', icon: '🟢'};
     };
 
+    const deleteCustomer = async (customer) => {
+        if (!window.confirm(`Are you sure you want to delete ${customer.name}? This will also delete all their messages. This action cannot be undone.`)) {
+            return;
+        }
+
+        setDeleting(customer.id);
+        try {
+            const response = await fetch(`${API_BASE_URL}/customers/${customer.id}`, {
+                method: 'DELETE',
+                headers: apiHeaders
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                setStatusMessage(`✅ ${result.message}`);
+                onRefresh(); // Refresh the customer list
+                setTimeout(() => setStatusMessage(''), 5000);
+            } else {
+                setStatusMessage('❌ Error deleting customer');
+                setTimeout(() => setStatusMessage(''), 5000);
+            }
+        } catch (err) {
+            setStatusMessage('❌ Error: ' + err.message);
+            setTimeout(() => setStatusMessage(''), 5000);
+        } finally {
+            setDeleting(null);
+        }
+    };
+
     return (
         <div>
             <h2>📋 Customer List</h2>
@@ -170,6 +201,19 @@ function CustomerList({customers, onSelect, onRefresh}) {
             <button onClick={loadCustomerStatuses} disabled={loadingStatuses}>
                 {loadingStatuses ? '🔄 Loading Statuses...' : '📊 Refresh Statuses'}
             </button>
+            
+            {statusMessage && (
+                <div style={{
+                    padding: '10px',
+                    marginTop: '10px',
+                    backgroundColor: statusMessage.includes('✅') ? '#e8f5e8' : '#ffebee',
+                    color: statusMessage.includes('✅') ? '#2e7d2e' : '#c62828',
+                    border: '1px solid ' + (statusMessage.includes('✅') ? '#4caf50' : '#f44336'),
+                    borderRadius: '4px'
+                }}>
+                    {statusMessage}
+                </div>
+            )}
 
             {customers.length === 0 ? (
                 <p>No customers found. Add some customers to get started!</p>
@@ -203,6 +247,21 @@ function CustomerList({customers, onSelect, onRefresh}) {
                                 <td>{customer.notes || 'None'}</td>
                                 <td>
                                     <button onClick={() => onSelect(customer)}>View Conversation</button>
+                                    <button 
+                                        onClick={() => deleteCustomer(customer)}
+                                        disabled={deleting === customer.id}
+                                        style={{
+                                            marginLeft: '10px',
+                                            backgroundColor: '#f44336',
+                                            color: 'white',
+                                            border: 'none',
+                                            padding: '5px 10px',
+                                            borderRadius: '4px',
+                                            cursor: deleting === customer.id ? 'not-allowed' : 'pointer'
+                                        }}
+                                    >
+                                        {deleting === customer.id ? '🔄 Deleting...' : '🗑️ Delete'}
+                                    </button>
                                 </td>
                             </tr>
                         );

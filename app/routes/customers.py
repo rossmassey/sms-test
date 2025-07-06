@@ -8,7 +8,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException, Query
 from google.cloud.firestore_v1.base_query import FieldFilter
 
-from ..database import get_customers_collection
+from ..database import get_customers_collection, get_messages_collection
 from ..models import Customer, CustomerCreate, CustomerUpdate, APIResponse
 
 router = APIRouter()
@@ -133,22 +133,32 @@ async def delete_customer(customer_id: str):
     """
     try:
         customers_ref = get_customers_collection()
-        doc_ref = customers_ref.document(customer_id)
-
+        messages_ref = get_messages_collection()
+        
         # Check if customer exists
-        doc = doc_ref.get()
-        if not doc.exists:
+        customer_doc = customers_ref.document(customer_id).get()
+        if not customer_doc.exists:
             raise HTTPException(status_code=404, detail="Customer not found")
 
-        # Delete customer
-        doc_ref.delete()
+        # Get customer data for response
+        customer_data = customer_doc.to_dict()
+        customer_name = customer_data.get('name', 'Unknown')
 
-        # TODO: Also delete associated messages
-        # This would require a batch operation or cloud function
+        # Delete all associated messages first
+        messages_query = messages_ref.where(filter=FieldFilter("customer_id", "==", customer_id))
+        messages_docs = list(messages_query.stream())
+        
+        messages_deleted = 0
+        for message_doc in messages_docs:
+            message_doc.reference.delete()
+            messages_deleted += 1
+
+        # Delete the customer
+        customers_ref.document(customer_id).delete()
 
         return APIResponse(
             success=True,
-            message=f"Customer {customer_id} deleted successfully"
+            message=f"Customer '{customer_name}' and {messages_deleted} associated messages deleted successfully"
         )
 
     except HTTPException:

@@ -179,23 +179,79 @@ class TestCustomerEndpoints:
         assert data["notes"] == "Updated notes"
     
     def test_delete_customer_success(self, auth_headers):
-        """Test successful customer deletion."""
-        # Use the mock from test_app
-        from tests.test_app import mock_customers_collection
+        """Test successful customer deletion with cascade message deletion."""
+        from tests.test_app import mock_customers_collection, mock_messages_collection
         
         # Mock existing customer
-        mock_doc = Mock()
-        mock_doc.exists = True
-        mock_doc_ref = Mock()
-        mock_doc_ref.get.return_value = mock_doc
-        mock_doc_ref.delete = Mock()
-        mock_customers_collection.document.return_value = mock_doc_ref
+        mock_customer_doc = Mock()
+        mock_customer_doc.exists = True
+        mock_customer_doc.to_dict.return_value = {"name": "John Doe", "phone": "+1234567890"}
+        mock_customer_doc_ref = Mock()
+        mock_customer_doc_ref.get.return_value = mock_customer_doc
+        mock_customer_doc_ref.delete = Mock()
+        mock_customers_collection.document.return_value = mock_customer_doc_ref
+        
+        # Mock messages associated with customer
+        mock_message_doc1 = Mock()
+        mock_message_doc1.reference.delete = Mock()
+        mock_message_doc2 = Mock()
+        mock_message_doc2.reference.delete = Mock()
+        
+        mock_messages_query = Mock()
+        mock_messages_query.stream.return_value = [mock_message_doc1, mock_message_doc2]
+        mock_messages_collection.where.return_value = mock_messages_query
         
         response = client.delete("/customers/test_customer_id", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        assert "deleted successfully" in data["message"]
+        assert "John Doe" in data["message"]
+        assert "2 associated messages" in data["message"]
+        
+        # Verify customer deletion was called
+        mock_customer_doc_ref.delete.assert_called_once()
+        
+        # Verify message deletions were called
+        mock_message_doc1.reference.delete.assert_called_once()
+        mock_message_doc2.reference.delete.assert_called_once()
+    
+    def test_delete_customer_not_found(self, auth_headers):
+        """Test deleting a non-existent customer."""
+        from tests.test_app import mock_customers_collection
+        
+        # Mock customer doesn't exist
+        mock_customer_doc = Mock()
+        mock_customer_doc.exists = False
+        mock_customers_collection.document.return_value.get.return_value = mock_customer_doc
+        
+        response = client.delete("/customers/nonexistent_id", headers=auth_headers)
+        assert response.status_code == 404
+        assert "Customer not found" in response.text
+    
+    def test_delete_customer_with_no_messages(self, auth_headers):
+        """Test deleting a customer with no associated messages."""
+        from tests.test_app import mock_customers_collection, mock_messages_collection
+        
+        # Mock existing customer
+        mock_customer_doc = Mock()
+        mock_customer_doc.exists = True
+        mock_customer_doc.to_dict.return_value = {"name": "Jane Doe", "phone": "+1987654321"}
+        mock_customer_doc_ref = Mock()
+        mock_customer_doc_ref.get.return_value = mock_customer_doc
+        mock_customer_doc_ref.delete = Mock()
+        mock_customers_collection.document.return_value = mock_customer_doc_ref
+        
+        # Mock no messages for this customer
+        mock_messages_query = Mock()
+        mock_messages_query.stream.return_value = []  # No messages
+        mock_messages_collection.where.return_value = mock_messages_query
+        
+        response = client.delete("/customers/test_customer_id", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "Jane Doe" in data["message"]
+        assert "0 associated messages" in data["message"]
 
 class TestMessageEndpoints:
     """Test message management endpoints."""

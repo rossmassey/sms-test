@@ -1,44 +1,33 @@
 # SMS Outreach Backend
 
-**AI-powered SMS conversation system for NextGen MedSpa** - Staff initiate conversations, AI maintains them automatically, and human staff intervene only when needed.
+AI-powered SMS conversation system for NextGen MedSpa with automated responses and escalation management.
 
-## 🎯 What This App Does
+## Overview
 
-Your staff starts SMS conversations with customers, and AI continues the conversation automatically until the customer is satisfied or human intervention is needed.
+This backend service enables staff to initiate SMS conversations with customers, with AI handling ongoing responses until human intervention is required. The system includes automatic escalation detection, manual override capabilities, and comprehensive conversation management.
 
-**Key Features:**
-- **Staff-Initiated Conversations**: Start personalized SMS conversations with customers
-- **Automatic AI Responses**: AI handles customer replies without staff involvement  
-- **Smart Escalation**: AI knows when to stop and alert staff for complex issues
-- **Manual Override**: Staff can intervene and send manual messages at any time
-- **NextGen MedSpa Integration**: Tailored for medical spa services and treatments
+## Features
 
-## 🎮 Live Demo
+- Staff-initiated SMS conversations
+- Automated AI responses to customer messages
+- Smart escalation detection for complex issues
+- Manual message override capabilities
+- Customer database management
+- Comprehensive conversation history
 
-**Want to see how it works?** Check out the interactive demo UI:
+## Quick Start
 
-```bash
-python3 run_demo.py
-```
-
-The demo shows the complete workflow: adding customers, starting AI conversations, mocking customer responses, and manual staff intervention. No real SMS needed!
-
-## 🚀 Quick Start
-
-### 1. Install Dependencies
+### Installation
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
-
-# For demo UI:
-cd jank_ui && npm install
 ```
 
-### 2. Configure Environment
+### Configuration
 
-Create a `.env` file with your service credentials:
+Create a `.env` file with required service credentials:
 
 ```bash
 # Firebase Configuration
@@ -57,120 +46,120 @@ OPENAI_API_KEY=your_openai_api_key
 API_KEY=your_secure_api_key_here
 ```
 
-### 3. Run Development Server
+### Running the Service
 
 ```bash
 python run_dev.py
 ```
 
-API available at `http://localhost:8000` with interactive docs at `/docs`
+The API will be available at `http://localhost:8000` with interactive documentation at `/docs`.
 
-## 📱 API Endpoints Overview
+## API Endpoints
 
 All endpoints require API key authentication via `X-API-Key` header.
 
-### Core Conversation Flow
+### Core Conversation Management
 
-| Endpoint | Purpose |
-|----------|---------|
-| `POST /messages/initial/sms` | **Start conversation** with customer |
-| `POST /messages/incoming` | **Handle customer replies** (Twilio webhook) |
-| `POST /messages/manual` | **Staff sends manual message** |
-| `GET /messages` | **View conversation history** |
-
-### Demo & Testing
-
-| Endpoint | Purpose |
-|----------|---------|
-| `POST /messages/initial/demo` | **Test AI messages** without SMS |
-| `POST /messages/ongoing/demo` | **Test AI responses** with chat history |
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/messages/initial/sms` | POST | Initiate SMS conversation with customer |
+| `/messages/incoming` | POST | Handle customer replies (Twilio webhook) |
+| `/messages/manual` | POST | Send manual staff message |
+| `/messages` | GET | Retrieve conversation history |
 
 ### Customer Management
 
-| Endpoint | Purpose |
-|----------|---------|
-| `POST /customers` | **Create customer** |
-| `GET /customers` | **List customers** |
-| `GET /customers/{id}` | **Get customer details** |
-| `PUT /customers/{id}` | **Update customer** |
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/customers` | POST | Create new customer |
+| `/customers` | GET | List all customers |
+| `/customers/{id}` | GET | Get customer details |
+| `/customers/{id}` | PUT | Update customer information |
+| `/customers/{id}` | DELETE | Delete customer and all messages |
 
-## 🤖 AI Message Types
+### Demo and Testing
 
-The AI can generate 7 types of personalized messages:
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/messages/initial/demo` | POST | Test AI message generation |
+| `/messages/ongoing/demo` | POST | Test AI responses with history |
 
-- **`welcome`** - New customer greeting
-- **`follow-up`** - Post-treatment check-in  
-- **`reminder`** - Appointment reminders
-- **`promotional`** - Special offers
-- **`support`** - Help with questions
-- **`thank-you`** - Gratitude messages
-- **`appointment`** - Scheduling related
+## AI Message Types
 
-## 🚨 Auto-Escalation System
+The system supports seven message types for personalized communication:
 
-AI automatically stops responding and alerts staff when it detects:
-- **Violence/Threats** - Any threatening language toward staff or property
-- **Legal Issues** - Mentions of suing, lawyers, malpractice, or legal action
-- **Medical Emergencies** - Severe pain, bleeding, allergic reactions, or complications
-- **Extreme Anger** - Unacceptable service complaints or insulting language
-- **Do Not Contact** - Complete silence for unsubscribe requests
+- `welcome` - New customer greeting
+- `follow-up` - Post-treatment check-in
+- `reminder` - Appointment reminders
+- `promotional` - Special offers
+- `support` - Customer support
+- `thank-you` - Gratitude messages
+- `appointment` - Scheduling related
 
-**Escalation Features:**
-- **Deterministic Pattern Detection** - Critical threats bypass AI for safety
-- **Contextual Acknowledgments** - Professional responses before escalation
-- **Complete Silence** - No response to "do not contact" requests
-- **Comprehensive Testing** - 28 test cases covering all escalation scenarios
+## Escalation System
 
-## 📊 Testing
+The AI automatically escalates conversations based on detection of:
+
+- Violence or threats toward staff/property
+- Legal issues or mentions of litigation
+- Medical emergencies or severe complications
+- Extreme anger or unacceptable complaints
+- Do-not-contact requests
+
+When escalation occurs, the system sends appropriate acknowledgment messages and flags the conversation for staff attention.
+
+## Demo UI
+
+For testing and demonstration purposes, run the included React interface:
+
+```bash
+python3 run_demo.py
+```
+
+This provides a complete workflow demonstration including customer management, conversation initiation, and staff intervention capabilities.
+
+## Testing
+
+Run the test suite with:
 
 ```bash
 python3 run_tests.py
 ```
 
-**Test Categories:**
-- `--unit` - Core API, SMS endpoints, and escalation detection (recommended for development)
-- `--integration` - Full stack tests with Firebase, OpenAI, and Twilio
-- `--utils` - Utility function validation tests
-- `--performance` - Load and performance benchmarks
+Test categories:
+- `--unit` - Core API and functionality tests
+- `--integration` - Full stack tests with external services
+- `--utils` - Utility function validation
+- `--performance` - Load and performance testing
 
-**Key Test Suites:**
-- **Escalation Detection** - 28 test cases covering violence, legal threats, medical emergencies, and do-not-contact scenarios
-- **SMS Endpoints** - All 4 new message endpoints with mocked services
-- **Core API** - Authentication, customer management, and database operations
-
-Use `-h` for additional test options and categories.
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 sms_app/
 ├── app/
-│   ├── main.py              # FastAPI app and middleware
-│   ├── database.py          # Firebase initialization  
-│   ├── models.py            # Data models and validation
+│   ├── main.py              # FastAPI application
+│   ├── database.py          # Firebase configuration
+│   ├── models.py            # Data models
 │   ├── routes/
-│   │   ├── customers.py     # Customer management endpoints
-│   │   └── messages.py      # SMS and conversation endpoints
+│   │   ├── customers.py     # Customer endpoints
+│   │   └── messages.py      # Message endpoints
 │   └── utils/
 │       ├── twilio_client.py # SMS functionality
-│       └── llm_client.py    # AI message generation
-├── jank_ui/                 # React demo UI
+│       └── llm_client.py    # AI integration
+├── jank_ui/                 # Demo interface
 ├── tests/                   # Test suite
-├── business_config.txt      # NextGen MedSpa configuration
-├── requirements.txt         # Dependencies
-└── .env                     # Environment variables
+├── business_config.txt      # Business configuration
+└── requirements.txt         # Dependencies
 ```
 
-## 🔗 Frontend Integration
+## Dependencies
 
-For detailed frontend integration examples, conversation flows, and demo UI architecture, see:
+- FastAPI - Web framework
+- Firebase Admin SDK - Database
+- Twilio - SMS messaging
+- OpenAI - AI message generation
+- React - Demo UI
 
-**[📖 Frontend Integration Guide](FRONTEND_GUIDE.md)**
+## Business Configuration
 
-## 🛠️ Dependencies
-
-- **FastAPI** - Web framework
-- **Firebase Admin SDK** - Database
-- **Twilio** - SMS messaging
-- **OpenAI** - AI message generation
-- **React** - Demo UI framework
+The system includes configurable business data in `business_config.txt` for context-aware AI responses. This allows the AI to handle basic business inquiries (hours, location, services) without escalation while maintaining appropriate boundaries for complex issues.
