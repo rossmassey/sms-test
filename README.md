@@ -17,34 +17,30 @@ This backend service enables staff to initiate SMS conversations with customers,
 
 ## Quick Start
 
+### Configuration
+
+Create a `.env` file from the template and fill in with required service credentials
+
+```bash
+cp .env.tmplate .env
+```
+
 ### Installation
 
 ```bash
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install -r requirements.txt
+cd jank_ui && npm install
 ```
 
-### Configuration
-
-Create a `.env` file with required service credentials:
+Back in the root of the repo:
 
 ```bash
-# Firebase Configuration
-FIREBASE_CRED_PATH=./firebase-service-account.json
-FIREBASE_PROJECT_ID=your-firebase-project-id
-
-# Twilio Configuration  
-TWILIO_ACCOUNT_SID=your_twilio_account_sid
-TWILIO_AUTH_TOKEN=your_twilio_auth_token
-TWILIO_PHONE_NUMBER=+1234567890
-
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key
-
-# Security
-API_KEY=your_secure_api_key_here
+python3 run_demo.py
 ```
+
+This provides a complete workflow demonstration including customer management, conversation initiation, and staff intervention capabilities.
 
 ### Running the Service
 
@@ -107,16 +103,6 @@ The AI automatically escalates conversations based on detection of:
 - Do-not-contact requests
 
 When escalation occurs, the system sends appropriate acknowledgment messages and flags the conversation for staff attention.
-
-## Demo UI
-
-For testing and demonstration purposes, run the included React interface:
-
-```bash
-python3 run_demo.py
-```
-
-This provides a complete workflow demonstration including customer management, conversation initiation, and staff intervention capabilities.
 
 ## Testing
 
